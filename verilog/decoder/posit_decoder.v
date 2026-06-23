@@ -30,14 +30,15 @@ module posit_decoder #(
 
     output reg signed [$clog2(N):0] k,
     output reg [ES-1:0] exponent,
-    output reg [N-1:0] mantissa
+
+    output reg [N-1:0] fraction,
+    output reg [$clog2(N):0] frac_len
 );
 
     integer i;
     integer run_length;
     integer exp_start;
     integer frac_start;
-    integer frac_len;
 
     reg [N-1:0] mag;
     reg regime_bit;
@@ -55,24 +56,23 @@ module posit_decoder #(
 
         k         = 0;
         exponent  = 0;
-        mantissa  = 0;
+        fraction  = 0;
+        frac_len  = 0;
 
         //--------------------------------------------------
         // Special cases
         //--------------------------------------------------
 
-        if (posit_in == {N{1'b0}}) begin
+        if (posit_in == {N{1'b0}})
             is_zero = 1'b1;
-        end
 
-        else if (posit_in == {1'b1,{(N-1){1'b0}}}) begin
+        else if (posit_in == {1'b1,{(N-1){1'b0}}})
             is_nar = 1'b1;
-        end
 
         else begin
 
             //--------------------------------------------------
-            // Undo two's complement if negative
+            // Undo posit sign encoding
             //--------------------------------------------------
 
             if (sign)
@@ -81,12 +81,12 @@ module posit_decoder #(
                 mag = posit_in;
 
             //--------------------------------------------------
-            // Determine regime
+            // Regime
             //--------------------------------------------------
 
             regime_bit = mag[N-2];
 
-            done = 0;
+            done       = 0;
             run_length = 0;
 
             for(i = 0; i < N-1; i = i + 1) begin
@@ -98,38 +98,30 @@ module posit_decoder #(
                 end
             end
 
-            //--------------------------------------------------
-            // Compute k
-            //--------------------------------------------------
-
             if(regime_bit)
                 k = run_length - 1;
             else
                 k = -run_length;
 
             //--------------------------------------------------
-            // Exponent extraction
+            // Exponent
             //--------------------------------------------------
 
             exp_start = run_length + 2;
 
-            exponent = 0;
-
             for(i = 0; i < ES; i = i + 1) begin
                 if(exp_start + i < N)
-                    exponent[ES-1-i] =
-                        mag[N-1-(exp_start+i)];
+                    exponent[ES-1-i]
+                        = mag[N-1-(exp_start+i)];
             end
 
             //--------------------------------------------------
-            // Mantissa extraction
-            // Stored as 1.fraction
+            // Fraction
+            // Example:
+            // fraction bits = 101
+            // output = 10100000
+            // frac_len = 3
             //--------------------------------------------------
-
-            mantissa = 0;
-
-            // Hidden bit
-            mantissa[N-1] = 1'b1;
 
             frac_start = exp_start + ES;
 
@@ -137,11 +129,9 @@ module posit_decoder #(
 
                 frac_len = N - frac_start;
 
-                for(i = 0; i < N-1; i = i + 1) begin
-                    if(i < frac_len)
-                        mantissa[N-2-i] =
-                            mag[N-1-(frac_start+i)];
-                end
+                for(i = 0; i < frac_len; i = i + 1)
+                    fraction[N-1-i]
+                        = mag[N-1-(frac_start+i)];
 
             end
 
