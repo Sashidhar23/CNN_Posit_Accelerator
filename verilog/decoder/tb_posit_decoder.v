@@ -33,58 +33,58 @@ module posit_decoder_tb;
     wire is_nar;
     wire signed [$clog2(N):0] k;
     wire [ES-1:0] exponent;
-    wire [N-1:0] mantissa;
+    wire [N-1:0] fraction;
+    wire [$clog2(N):0] frac_len;
 
     posit_decoder #(
-    .N(N),
-    .ES(ES)
-     ) DUT (
-    .posit_in(posit_in),
-    .sign(sign),
-    .is_zero(is_zero),
-    .is_nar(is_nar),
-    .k(k),
-    .exponent(exponent),
-    .mantissa(mantissa)
+        .N(N),
+        .ES(ES)
+    ) DUT (
+        .posit_in(posit_in),
+        .sign(sign),
+        .is_zero(is_zero),
+        .is_nar(is_nar),
+        .k(k),
+        .exponent(exponent),
+        .fraction(fraction),
+        .frac_len(frac_len)
     );
-    
+
     task show_result;
-begin
-    $display(
-        "%b | s=%0d z=%0d nar=%0d k=%0d exp=%0d mant=%b",
-        posit_in,
-        sign,
-        is_zero,
-        is_nar,
-        k,
-        exponent,
-        mantissa
-    );
-end
-endtask
+    begin
+        $display(
+            "%b | s=%0d z=%0d nar=%0d k=%0d exp=%0d frac=%b len=%0d",
+            posit_in,
+            sign,
+            is_zero,
+            is_nar,
+            k,
+            exponent,
+            fraction,
+            frac_len
+        );
+    end
+    endtask
 
     initial begin
+        $display("------------------------------------------------------------");
+        $display("Posit      | s z nar k exp fraction len");
+        $display("------------------------------------------------------------");
 
-    $display("------------------------------------------------------------");
-    $display("Posit      | s z nar k exp mantissa");
-    $display("------------------------------------------------------------");
+        posit_in = 8'b00000000; #10; show_result();
+        posit_in = 8'b10000000; #10; show_result();
 
-    posit_in = 8'b00000000; #10; show_result();
-    posit_in = 8'b10000000; #10; show_result();
+        posit_in = 8'b01000000; #10; show_result(); // +1
+        posit_in = 8'b01010000; #10; show_result();
+        posit_in = 8'b01100000; #10; show_result();
+        posit_in = 8'b01110000; #10; show_result();
 
-    posit_in = 8'b01000000; #10; show_result(); // +1
-    posit_in = 8'b01010000; #10; show_result();
-    posit_in = 8'b01100000; #10; show_result();
-    posit_in = 8'b01110000; #10; show_result();
+        posit_in = 8'b00110000; #10; show_result();
+        posit_in = 8'b00100000; #10; show_result();
+        posit_in = 8'b00010000; #10; show_result();
 
-    posit_in = 8'b00110000; #10; show_result();
-    posit_in = 8'b00100000; #10; show_result();
-    posit_in = 8'b00010000; #10; show_result();
-
-    $display("------------------------------------------------------------");
-
-    $finish;
-
-end
+        $display("------------------------------------------------------------");
+        $finish;
+    end
 
 endmodule
