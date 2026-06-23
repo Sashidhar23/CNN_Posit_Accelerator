@@ -39,18 +39,14 @@ module posit_decoder #(
     integer run_length;
     integer exp_start;
     integer frac_start;
+    integer raw_frac_len;
 
     reg [N-1:0] mag;
     reg regime_bit;
     reg done;
 
     always @(*) begin
-
-        //--------------------------------------------------
-        // Defaults
-        //--------------------------------------------------
-
-        sign      = posit_in[N-1];
+        sign      = 1'b0;
         is_zero   = 1'b0;
         is_nar    = 1'b0;
 
@@ -58,85 +54,75 @@ module posit_decoder #(
         exponent  = 0;
         fraction  = 0;
         frac_len  = 0;
+        mag       = 0;
+        regime_bit = 0;
+        done      = 0;
+        run_length = 0;
+        exp_start  = 0;
+        frac_start = 0;
+        raw_frac_len = 0;
 
-        //--------------------------------------------------
-        // Special cases
-        //--------------------------------------------------
-
-        if (posit_in == {N{1'b0}})
+        if (posit_in == {N{1'b0}}) begin
             is_zero = 1'b1;
-
-        else if (posit_in == {1'b1,{(N-1){1'b0}}})
+        end
+        else if (posit_in == {1'b1, {(N-1){1'b0}}}) begin
             is_nar = 1'b1;
-
+        end
         else begin
+            sign = posit_in[N-1];
 
-            //--------------------------------------------------
             // Undo posit sign encoding
-            //--------------------------------------------------
-
             if (sign)
                 mag = (~posit_in) + 1'b1;
             else
                 mag = posit_in;
 
-            //--------------------------------------------------
-            // Regime
-            //--------------------------------------------------
-
+            // Regime starts at bit N-2
             regime_bit = mag[N-2];
 
             done       = 0;
             run_length = 0;
 
-            for(i = 0; i < N-1; i = i + 1) begin
-                if(!done) begin
-                    if(mag[N-2-i] == regime_bit)
+            for (i = 0; i < N-1; i = i + 1) begin
+                if (!done) begin
+                    if (mag[N-2-i] == regime_bit)
                         run_length = run_length + 1;
                     else
                         done = 1;
                 end
             end
 
-            if(regime_bit)
+            if (regime_bit)
                 k = run_length - 1;
             else
                 k = -run_length;
 
-            //--------------------------------------------------
-            // Exponent
-            //--------------------------------------------------
-
+            // Exponent starts after regime run + terminating bit
             exp_start = run_length + 2;
 
-            for(i = 0; i < ES; i = i + 1) begin
-                if(exp_start + i < N)
-                    exponent[ES-1-i]
-                        = mag[N-1-(exp_start+i)];
+            for (i = 0; i < ES; i = i + 1) begin
+                if (exp_start + i < N)
+                    exponent[ES-1-i] = mag[N-1-(exp_start+i)];
             end
 
-            //--------------------------------------------------
-            // Fraction
-            // Example:
-            // fraction bits = 101
-            // output = 10100000
-            // frac_len = 3
-            //--------------------------------------------------
-
+            // Fraction bits come after exponent
             frac_start = exp_start + ES;
 
-            if(frac_start < N) begin
+            if (frac_start < N) begin
+                raw_frac_len = N - frac_start;
 
-                frac_len = N - frac_start;
+                // Trim zero padding left by the encoder after the valid bits.
+                for (i = 0; i < raw_frac_len; i = i + 1) begin
+                    if (mag[N-1-(frac_start+i)])
+                        frac_len = i + 1;
+                end
 
-                for(i = 0; i < frac_len; i = i + 1)
-                    fraction[N-1-i]
-                        = mag[N-1-(frac_start+i)];
-
+                // Store fraction left-justified:
+                // first fraction bit goes to fraction[N-1]
+                for (i = 0; i < frac_len; i = i + 1)
+                    fraction[N-1-i] = mag[N-1-(frac_start+i)];
             end
-
         end
-
     end
 
 endmodule
