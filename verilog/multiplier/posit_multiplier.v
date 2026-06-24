@@ -34,127 +34,159 @@ module posit_multiplier #(
     output wire [N-1:0] posit_out
 );
 
-    // -----------------------------------------------------------------------
-    // Decoder A
-    // -----------------------------------------------------------------------
-    wire        sign_a;
-    wire        zero_a, nar_a;
+    // --------------------------------------------------
+    // Decoder A outputs
+    // --------------------------------------------------
+    wire sign_a;
+    wire zero_a;
+    wire nar_a;
+
     wire signed [$clog2(N):0] k_a;
-    wire [ES-1:0]             exp_a;
-    wire [N-1:0]              frac_a;
-    wire [$clog2(N):0]        flen_a;
+    wire [ES-1:0] exponent_a;
 
-    posit_decoder #(.N(N), .ES(ES)) DEC_A (
-        .posit_in  (posit_a),
-        .sign      (sign_a),
-        .is_zero   (zero_a),
-        .is_nar    (nar_a),
-        .k         (k_a),
-        .exponent  (exp_a),
-        .fraction  (frac_a),
-        .frac_len  (flen_a)
-    );
+    wire [N-1:0] fraction_a;
+    wire [$clog2(N):0] frac_len_a;
 
-    // -----------------------------------------------------------------------
-    // Decoder B
-    // -----------------------------------------------------------------------
-    wire        sign_b;
-    wire        zero_b, nar_b;
+    // --------------------------------------------------
+    // Decoder B outputs
+    // --------------------------------------------------
+    wire sign_b;
+    wire zero_b;
+    wire nar_b;
+
     wire signed [$clog2(N):0] k_b;
-    wire [ES-1:0]             exp_b;
-    wire [N-1:0]              frac_b;
-    wire [$clog2(N):0]        flen_b;
+    wire [ES-1:0] exponent_b;
 
-    posit_decoder #(.N(N), .ES(ES)) DEC_B (
-        .posit_in  (posit_b),
-        .sign      (sign_b),
-        .is_zero   (zero_b),
-        .is_nar    (nar_b),
-        .k         (k_b),
-        .exponent  (exp_b),
-        .fraction  (frac_b),
-        .frac_len  (flen_b)
+    wire [N-1:0] fraction_b;
+    wire [$clog2(N):0] frac_len_b;
+
+    // --------------------------------------------------
+    // Encoder input regs
+    // --------------------------------------------------
+    reg enc_sign;
+    reg enc_zero;
+    reg enc_nar;
+
+    reg signed [$clog2(N):0] enc_k;
+    reg [ES-1:0] enc_exponent;
+
+    reg [N-1:0] enc_fraction;
+    reg [$clog2(N):0] enc_frac_len;
+
+    // --------------------------------------------------
+    // Decoder instances
+    // --------------------------------------------------
+    posit_decoder #(
+        .N(N),
+        .ES(ES)
+    ) DEC_A (
+        .posit_in (posit_a),
+        .sign     (sign_a),
+        .is_zero  (zero_a),
+        .is_nar   (nar_a),
+        .k        (k_a),
+        .exponent (exponent_a),
+        .fraction (fraction_a),
+        .frac_len (frac_len_a)
     );
 
-    // -----------------------------------------------------------------------
-    // Encoder
-    // -----------------------------------------------------------------------
-    reg        enc_sign;
-    reg        enc_zero;
-    reg        enc_nar;
-    reg signed [$clog2(N):0] enc_k;
-    reg [ES-1:0]             enc_exp;
-    reg [N-1:0]              enc_frac;
-    reg [$clog2(N):0]        enc_flen;
+    posit_decoder #(
+        .N(N),
+        .ES(ES)
+    ) DEC_B (
+        .posit_in (posit_b),
+        .sign     (sign_b),
+        .is_zero  (zero_b),
+        .is_nar   (nar_b),
+        .k        (k_b),
+        .exponent (exponent_b),
+        .fraction (fraction_b),
+        .frac_len (frac_len_b)
+    );
 
-    posit_encoder #(.N(N), .ES(ES)) ENC (
+    // --------------------------------------------------
+    // Encoder instance
+    // --------------------------------------------------
+    posit_encoder #(
+        .N(N),
+        .ES(ES)
+    ) ENC (
         .sign      (enc_sign),
         .is_zero   (enc_zero),
         .is_nar    (enc_nar),
         .k         (enc_k),
-        .exponent  (enc_exp),
-        .fraction  (enc_frac),
-        .frac_len  (enc_flen),
+        .exponent  (enc_exponent),
+        .fraction  (enc_fraction),
+        .frac_len  (enc_frac_len),
         .posit_out (posit_out)
     );
 
-    // -----------------------------------------------------------------------
-    // Multiply logic
-    // -----------------------------------------------------------------------
-    // We need enough bits for the signed total exponent sum.
-    // Maximum k magnitude for posit<N> is N-2, so total_exp fits in
-    // ceil(log2((N-2)*2^ES * 2 + 2^ES)) bits – 8 bits is comfortable for N<=32.
-    localparam TE_BITS = $clog2(N) + ES + 3; // signed total-exponent width
+    // --------------------------------------------------
+    // Internal widths
+    // --------------------------------------------------
+    localparam integer MANT_W  = N + 1;              // hidden 1 + N fraction bits
+    localparam integer PROD_W  = 2 * MANT_W;         // product width = 2N + 2
+    localparam integer TE_BITS = $clog2(N) + ES + 4; // total exponent width
+
+    // --------------------------------------------------
+    // Internal signals
+    // --------------------------------------------------
+    reg [MANT_W-1:0] mant_a;
+    reg [MANT_W-1:0] mant_b;
+
+    reg [PROD_W-1:0] product;
+
+    reg signed [TE_BITS-1:0] scale_a;
+    reg signed [TE_BITS-1:0] scale_b;
+    reg signed [TE_BITS-1:0] total_scale;
+
+    reg [N-1:0] fraction_out;
+    reg [$clog2(N):0] frac_len_out;
 
     integer i;
+    integer k_int;
+    integer exp_int;
 
-    // 1.fraction representation: bit N is the hidden '1', bits N-1..0 are the
-    // fraction field (left-justified as stored by the decoder).
-    // We use (N+1)-bit operands.
-    reg [N:0] mant_a;
-    reg [N:0] mant_b;
+    // sign-extended k values
+    reg signed [TE_BITS-1:0] k_a_ext;
+    reg signed [TE_BITS-1:0] k_b_ext;
 
-    // Product is (2N+2) bits wide.
-    reg [2*N+1:0] product;
-
-    // Normalised fraction (upper N bits of the product fraction part).
-    reg [N-1:0]        frac_out;
-    reg [$clog2(N):0]  flen_out;
-
-    reg signed [TE_BITS-1:0] total_exp;
-    reg signed [TE_BITS-1:0] total_exp_a;
-    reg signed [TE_BITS-1:0] total_exp_b;
-
-    // Temporaries for k/exp split
-    reg signed [TE_BITS-1:0] te_norm;
-    integer                   k_int;
-    integer                   e_int;
-
+    // --------------------------------------------------
+    // Main combinational logic
+    // --------------------------------------------------
     always @(*) begin
+
+        //--------------------------------------------------
         // Defaults
-        enc_sign = 1'b0;
-        enc_zero = 1'b0;
-        enc_nar  = 1'b0;
-        enc_k    = 0;
-        enc_exp  = 0;
-        enc_frac = 0;
-        enc_flen = 0;
+        //--------------------------------------------------
+        enc_sign      = 1'b0;
+        enc_zero      = 1'b0;
+        enc_nar       = 1'b0;
+        enc_k         = 0;
+        enc_exponent  = 0;
+        enc_fraction  = 0;
+        enc_frac_len  = 0;
 
-        mant_a    = 0;
-        mant_b    = 0;
-        product   = 0;
-        frac_out  = 0;
-        flen_out  = 0;
-        total_exp = 0;
-        total_exp_a = 0;
-        total_exp_b = 0;
-        te_norm   = 0;
-        k_int     = 0;
-        e_int     = 0;
+        mant_a        = 0;
+        mant_b        = 0;
+        product       = 0;
 
-        // ------------------------------------------------------------------
+        scale_a       = 0;
+        scale_b       = 0;
+        total_scale   = 0;
+
+        fraction_out  = 0;
+        frac_len_out  = 0;
+
+        k_int         = 0;
+        exp_int       = 0;
+
+        k_a_ext       = 0;
+        k_b_ext       = 0;
+
+        //--------------------------------------------------
         // Special cases
-        // ------------------------------------------------------------------
+        //--------------------------------------------------
         if (nar_a || nar_b) begin
             enc_nar = 1'b1;
         end
@@ -162,100 +194,130 @@ module posit_multiplier #(
             enc_zero = 1'b1;
         end
         else begin
-            // ----------------------------------------------------------------
-            // Sign
-            // ----------------------------------------------------------------
+
+            //--------------------------------------------------
+            // Result sign
+            //--------------------------------------------------
             enc_sign = sign_a ^ sign_b;
 
-            // ----------------------------------------------------------------
-            // Build 1.fraction mantissas  (hidden bit = 1 at position N)
-            // ----------------------------------------------------------------
-            mant_a = {1'b1, frac_a};   // 1.fraction_a  (N+1 bits)
-            mant_b = {1'b1, frac_b};   // 1.fraction_b  (N+1 bits)
+            //--------------------------------------------------
+            // Build mantissas
+            //
+            // Decoder gives:
+            // fraction = 10100000
+            //
+            // So mantissa becomes:
+            // 1.10100000
+            //--------------------------------------------------
+            mant_a = {1'b1, fraction_a};
+            mant_b = {1'b1, fraction_b};
 
-            // ----------------------------------------------------------------
-            // (2N+2)-bit product
-            // ----------------------------------------------------------------
+            //--------------------------------------------------
+            // Multiply mantissas
+            //
+            // mant_a and mant_b are Q1.N style:
+            // 1.xxxxx
+            //
+            // product is Q2.2N style:
+            // [2N+1 : 0]
+            //--------------------------------------------------
             product = mant_a * mant_b;
 
-            // ----------------------------------------------------------------
-            // Total exponent = k*2^ES + exp  for each operand
-            // ----------------------------------------------------------------
-            total_exp_a = ($signed({{(TE_BITS - $clog2(N) - 1){k_a[$clog2(N)]}}, k_a}) <<< ES)
-                          + {{(TE_BITS - ES){1'b0}}, exp_a};
+            //--------------------------------------------------
+            // Compute scale
+            //
+            // scale = k * 2^ES + exponent
+            //--------------------------------------------------
+            k_a_ext = {{(TE_BITS-($clog2(N)+1)){k_a[$clog2(N)]}}, k_a};
+            k_b_ext = {{(TE_BITS-($clog2(N)+1)){k_b[$clog2(N)]}}, k_b};
 
-            total_exp_b = ($signed({{(TE_BITS - $clog2(N) - 1){k_b[$clog2(N)]}}, k_b}) <<< ES)
-                          + {{(TE_BITS - ES){1'b0}}, exp_b};
+            scale_a = (k_a_ext <<< ES) + {{(TE_BITS-ES){1'b0}}, exponent_a};
+            scale_b = (k_b_ext <<< ES) + {{(TE_BITS-ES){1'b0}}, exponent_b};
 
-            total_exp = total_exp_a + total_exp_b;
+            total_scale = scale_a + scale_b;
 
-            // ----------------------------------------------------------------
-            // Normalise product
-            //   mant_a and mant_b are both in [1.0, 2.0)
-            //   so product is in [1.0, 4.0)
-            //   MSB of product is at bit 2N+1.
-            //   The integer part of the product occupies the top 2 bits:
-            //     product[2N+1:2N]
-            //   If product[2N+1] == 1  → result >= 2, shift right, inc total_exp
-            //   If product[2N]   == 1  → result in [1,2), no shift needed
-            //   (product is always >= 1 since both mantissas >= 1)
-            // ----------------------------------------------------------------
+            //--------------------------------------------------
+            // Normalize product
+            //
+            // product range:
+            // mant_a in [1,2)
+            // mant_b in [1,2)
+            //
+            // product in [1,4)
+            //
+            // If product[2N+1] = 1:
+            //     product is in [2,4)
+            //     normalize by shifting right 1
+            //     total_scale += 1
+            //
+            // Else:
+            //     product is in [1,2)
+            //--------------------------------------------------
+
             if (product[2*N+1]) begin
-                // Result >= 2: normalise by shifting right 1
-                total_exp = total_exp + 1;
-                // Fraction bits are product[2N-1 : N]  (top N bits after hidden 1 at 2N)
-                frac_out = product[2*N-1 -: N];
+                // product >= 2
+                total_scale = total_scale + 1;
+
+                // After normalization, hidden 1 is effectively at bit 2N.
+                // Fraction starts at original product[2N].
+                fraction_out = product[2*N -: N];
             end
             else begin
-                // Result in [1, 2): fraction bits are product[2N-1 : N]
-                // Hidden 1 is at bit 2N, fraction starts at bit 2N-1
-                frac_out = product[2*N-1 -: N];
+                // product in [1,2)
+                // Hidden 1 is already at bit 2N.
+                // Fraction starts at product[2N-1].
+                fraction_out = product[2*N-1 -: N];
             end
 
-            // ----------------------------------------------------------------
-            // Compute frac_len: trim trailing zeros from frac_out
-            // ----------------------------------------------------------------
-            flen_out = 0;
+            //--------------------------------------------------
+            // Compute fraction length by trimming trailing zeros
+            //
+            // fraction_out = 10100000 -> frac_len = 3
+            //--------------------------------------------------
+            frac_len_out = 0;
+
             for (i = 0; i < N; i = i + 1) begin
-                if (frac_out[N-1-i])
-                    flen_out = i + 1;
+                if (fraction_out[N-1-i])
+                    frac_len_out = i + 1;
             end
 
-            // ----------------------------------------------------------------
-            // Split total_exp back into k and exp
-            //   total_exp = k * 2^ES + exp,  0 <= exp < 2^ES
-            //   Use floor division so that exp is always non-negative.
-            // ----------------------------------------------------------------
+            //--------------------------------------------------
+            // Split total_scale back into k and exponent
+            //
+            // total_scale = k * 2^ES + exponent
+            //
+            // For ES=1:
+            // total_scale = 2k + exponent
+            //
+            // Need floor division for negative total_scale.
+            //--------------------------------------------------
             if (ES == 0) begin
-                k_int = total_exp;
-                e_int = 0;
+                k_int   = total_scale;
+                exp_int = 0;
             end
             else begin
-                // Arithmetic (floor) divide by 2^ES
-                // For negative total_exp we need floor, not truncation.
-                te_norm = total_exp;
-                if (te_norm[TE_BITS-1] && (te_norm[ES-1:0] != 0)) begin
-                    // Negative and not exactly divisible → floor = trunc - 1
-                    k_int = (te_norm >>> ES) - 1;
-                end
-                else begin
-                    k_int = te_norm >>> ES;
-                end
-                e_int = total_exp - (k_int <<< ES);
+                // Arithmetic shift gives floor division by 2^ES
+                // for two's-complement signed values.
+                k_int = total_scale >>> ES;
+
+                exp_int = total_scale - (k_int <<< ES);
             end
 
-            // ----------------------------------------------------------------
-            // Saturate k to valid posit range  [-(N-2), N-2]
-            // ----------------------------------------------------------------
+            //--------------------------------------------------
+            // Saturate k to approximate valid posit range
+            //--------------------------------------------------
             if (k_int > (N-2))
                 k_int = N-2;
             else if (k_int < -(N-2))
                 k_int = -(N-2);
 
-            enc_k   = k_int[$clog2(N):0];
-            enc_exp = e_int[ES-1:0];
-            enc_frac = frac_out;
-            enc_flen = flen_out;
+            //--------------------------------------------------
+            // Feed encoder
+            //--------------------------------------------------
+            enc_k        = k_int[$clog2(N):0];
+            enc_exponent = exp_int[ES-1:0];
+            enc_fraction = fraction_out;
+            enc_frac_len = frac_len_out;
         end
     end
 
