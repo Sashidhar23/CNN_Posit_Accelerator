@@ -8,7 +8,7 @@ module tb_posit_quire_mac;
     parameter QF = 64;
 
     reg clk;
-    reg rst;
+    reg reset;
     reg clear;
     reg enable;
     reg [N-1:0] posit_a;
@@ -27,7 +27,7 @@ module tb_posit_quire_mac;
         .QF(QF)
     ) DUT (
         .clk       (clk),
-        .rst       (rst),
+        .reset     (reset),
         .clear     (clear),
         .enable    (enable),
         .posit_a   (posit_a),
@@ -42,26 +42,44 @@ module tb_posit_quire_mac;
     task mac_once;
         input [N-1:0] a;
         input [N-1:0] b;
+        input signed [QW-1:0] expected_quire;
+        input [N-1:0] expected_posit;
+        input expected_nar;
+        input [511:0] name;
         begin
             posit_a = a;
             posit_b = b;
             enable = 1'b1;
+
+            $display("------------------------------------------");
+            $display("%0s", name);
+            $display("A      = %b", posit_a);
+            $display("B      = %b", posit_b);
+
             @(posedge clk);
             #1;
             enable = 1'b0;
+
+            check_state(expected_quire, expected_posit, expected_nar, "after enabled MAC");
         end
     endtask
 
-    task check_out;
+    task check_state;
+        input signed [QW-1:0] expected_quire;
         input [N-1:0] expected;
+        input expected_nar;
         input [511:0] name;
         begin
             $display("------------------------------------------");
             $display("%0s", name);
-            $display("OUT = %b", posit_out);
-            $display("EXP = %b", expected);
+            $display("QUIRE = %0d", quire_out);
+            $display("QEXP  = %0d", expected_quire);
+            $display("OUT   = %b", posit_out);
+            $display("EXP   = %b", expected);
+            $display("NAR   = %b", is_nar);
+            $display("NEXP  = %b", expected_nar);
 
-            if (posit_out !== expected) begin
+            if (quire_out !== expected_quire || posit_out !== expected || is_nar !== expected_nar) begin
                 $display("FAIL");
                 errors = errors + 1;
             end
@@ -71,9 +89,22 @@ module tb_posit_quire_mac;
         end
     endtask
 
+    task clear_acc;
+        begin
+            clear = 1'b1;
+            enable = 1'b0;
+            posit_a = 0;
+            posit_b = 0;
+            @(posedge clk);
+            #1;
+            clear = 1'b0;
+            check_state({QW{1'b0}}, 8'b00000000, 1'b0, "clear gives zero");
+        end
+    endtask
+
     initial begin
         clk = 1'b0;
-        rst = 1'b1;
+        reset = 1'b1;
         clear = 1'b0;
         enable = 1'b0;
         posit_a = 0;
@@ -85,34 +116,38 @@ module tb_posit_quire_mac;
         $display("==========================================");
 
         repeat (2) @(posedge clk);
-        rst = 1'b0;
+        reset = 1'b0;
         #1;
-        check_out(8'b00000000, "T1 : Reset gives zero");
+        check_state({QW{1'b0}}, 8'b00000000, 1'b0, "T1 : Reset gives zero");
 
-        mac_once(8'b01000000, 8'b01000000);
-        check_out(8'b01000000, "T2 : 1 * 1 accumulated = 1");
+        mac_once(8'b01000000, 8'b01000000, $signed(128'd1 <<< QF), 8'b01000000, 1'b0,
+                 "T2 : 1 * 1 accumulated = 1");
 
-        mac_once(8'b01000000, 8'b01000000);
-        check_out(8'b01010000, "T3 : 1 + 1 accumulated = 2");
+        mac_once(8'b01000000, 8'b01000000, $signed(128'd2 <<< QF), 8'b01010000, 1'b0,
+                 "T3 : 1 + 1 accumulated = 2");
 
-        clear = 1'b1;
+        enable = 1'b0;
+        posit_a = 8'b01010000;
+        posit_b = 8'b01010000;
         @(posedge clk);
         #1;
-        clear = 1'b0;
+        check_state($signed(128'd2 <<< QF), 8'b01010000, 1'b0,
+                    "T4 : enable low holds accumulator");
 
-        mac_once(8'b01010000, 8'b01010000);
-        check_out(8'b01100000, "T4 : 2 * 2 accumulated = 4");
+        clear_acc();
 
-        clear = 1'b1;
-        @(posedge clk);
-        #1;
-        clear = 1'b0;
+        mac_once(8'b01010000, 8'b01010000, $signed(128'd4 <<< QF), 8'b01100000, 1'b0,
+                 "T5 : 2 * 2 accumulated = 4");
 
-        mac_once(8'b11000000, 8'b01000000);
-        check_out(8'b11000000, "T5 : -1 * 1 accumulated = -1");
+        clear_acc();
 
-        mac_once(8'b10000000, 8'b01000000);
-        check_out(8'b10000000, "T6 : NaR input makes output NaR");
+        mac_once(8'b11000000, 8'b01000000, -$signed(128'd1 <<< QF), 8'b11000000, 1'b0,
+                 "T6 : -1 * 1 accumulated = -1");
+
+        mac_once(8'b10000000, 8'b01000000, -$signed(128'd1 <<< QF), 8'b10000000, 1'b1,
+                 "T7 : NaR input makes output NaR");
+
+        clear_acc();
 
         $display("==========================================");
         if (errors == 0)
