@@ -24,7 +24,7 @@ module posit_quire_mac #(
     parameter QF = QW / 2
 )(
     input  wire             clk,
-    input  wire             rst,
+    input  wire             reset,
     input  wire             clear,
     input  wire             enable,
 
@@ -125,7 +125,7 @@ module posit_quire_mac #(
     // Quire accumulator
     // -----------------------------------------------------------------------
     always @(posedge clk) begin
-        if (rst) begin
+        if (reset) begin
             quire_out <= {QW{1'b0}};
             is_nar    <= 1'b0;
         end
@@ -225,11 +225,7 @@ module posit_quire_mac #(
                     e_int = 0;
                 end
                 else begin
-                    if (result_scale < 0 && (result_scale - ((result_scale >>> ES) <<< ES)) != 0)
-                        k_int = (result_scale >>> ES) - 1;
-                    else
-                        k_int = result_scale >>> ES;
-
+                    k_int = result_scale >>> ES;
                     e_int = result_scale - (k_int <<< ES);
                 end
 
