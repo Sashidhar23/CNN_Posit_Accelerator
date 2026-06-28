@@ -21,6 +21,9 @@ module tb_systolic_array_quire;
     wire [ROWS*COLS*N-1:0]      weight_out;
     wire [ROWS*COLS*QW-1:0]     quire_out;
     wire [ROWS*COLS-1:0]        is_nar;
+    wire [COLS*QW-1:0]          psum_quire_out;
+    wire [COLS-1:0]             psum_nar_out;
+    wire [COLS*N-1:0]           psum_out;
     wire [ROWS*COLS*N-1:0]      pe_output;
 
     integer errors;
@@ -56,6 +59,9 @@ module tb_systolic_array_quire;
         .weight_out     (weight_out),
         .quire_out      (quire_out),
         .is_nar         (is_nar),
+        .psum_quire_out (psum_quire_out),
+        .psum_nar_out   (psum_nar_out),
+        .psum_out       (psum_out),
         .pe_output      (pe_output)
     );
 
