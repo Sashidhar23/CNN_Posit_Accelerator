@@ -21,11 +21,15 @@ module tb_pe_quire;
 
     reg  [N-1:0]     input_in;
     reg  [N-1:0]     weight_in;
+    wire signed [QW-1:0] psum_in;
+    wire             psum_nar_in;
 
     wire [N-1:0]     input_out;
     wire [N-1:0]     weight_out;
     wire signed [QW-1:0] quire_out;
     wire             is_nar;
+    wire signed [QW-1:0] psum_out;
+    wire             psum_nar_out;
     wire [N-1:0]     pe_output;
 
     integer errors;
@@ -67,12 +71,19 @@ module tb_pe_quire;
         .wshift    (wshift),
         .input_in  (input_in),
         .weight_in (weight_in),
+        .psum_in   (psum_in),
+        .psum_nar_in(psum_nar_in),
         .input_out (input_out),
         .weight_out(weight_out),
         .quire_out (quire_out),
         .is_nar    (is_nar),
+        .psum_out  (psum_out),
+        .psum_nar_out(psum_nar_out),
         .pe_output (pe_output)
     );
+
+    assign psum_in = QUIRE_ZERO;
+    assign psum_nar_in = 1'b0;
 
     //--------------------------------------------------
     // Clock generation
