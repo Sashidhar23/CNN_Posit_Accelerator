@@ -19,11 +19,13 @@ module tb_pe;
 
     reg  [N-1:0]     input_in;
     reg  [N-1:0]     weight_in;
+    wire [N-1:0]     psum_in;
 
     wire [N-1:0]     input_out;
     wire [N-1:0]     weight_out;
     wire [N-1:0]     product_out;
     wire [N-1:0]     mac_out;
+    wire [N-1:0]     psum_out;
     wire [N-1:0]     pe_output;
 
     integer errors;
@@ -52,12 +54,16 @@ module tb_pe;
         .wshift      (wshift),
         .input_in    (input_in),
         .weight_in   (weight_in),
+        .psum_in     (psum_in),
         .input_out   (input_out),
         .weight_out  (weight_out),
         .product_out (product_out),
         .mac_out     (mac_out),
+        .psum_out    (psum_out),
         .pe_output   (pe_output)
     );
+
+    assign psum_in = POSIT_ZERO;
 
     //--------------------------------------------------
     // Clock generation
