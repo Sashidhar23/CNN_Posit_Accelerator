@@ -19,6 +19,7 @@ module tb_systolic_array;
     wire [ROWS*COLS*N-1:0]      weight_out;
     wire [ROWS*COLS*N-1:0]      product_out;
     wire [ROWS*COLS*N-1:0]      mac_out;
+    wire [COLS*N-1:0]           psum_out;
     wire [ROWS*COLS*N-1:0]      pe_output;
 
     integer errors;
@@ -46,6 +47,7 @@ module tb_systolic_array;
         .weight_out     (weight_out),
         .product_out    (product_out),
         .mac_out        (mac_out),
+        .psum_out       (psum_out),
         .pe_output      (pe_output)
     );
 
