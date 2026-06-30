@@ -19,15 +19,22 @@ module systolic_array #(
     output wire [ROWS*COLS*N-1:0]       weight_out,
     output wire [ROWS*COLS*N-1:0]       product_out,
     output wire [ROWS*COLS*N-1:0]       mac_out,
+    output wire [COLS*N-1:0]            psum_out,
     output wire [ROWS*COLS*N-1:0]       pe_output
 );
 
     wire [ROWS*(COLS+1)*N-1:0] act_bus;
+    wire [(ROWS+1)*COLS*N-1:0] psum_bus;
 
     genvar r;
     genvar c;
 
     generate
+        for (c = 0; c < COLS; c = c + 1) begin : PSUM_INIT_GEN
+            assign psum_bus[c*N +: N] = {N{1'b0}};
+            assign psum_out[c*N +: N] = psum_bus[(ROWS*COLS+c)*N +: N];
+        end
+
         for (r = 0; r < ROWS; r = r + 1) begin : ROW_GEN
             assign act_bus[(r*(COLS+1))*N +: N] = activation_in[r*N +: N];
             assign activation_out[r*N +: N] = act_bus[(r*(COLS+1)+COLS)*N +: N];
@@ -44,10 +51,12 @@ module systolic_array #(
                     .wshift      (wshift),
                     .input_in    (act_bus[(r*(COLS+1)+c)*N +: N]),
                     .weight_in   (weight_in[(r*COLS+c)*N +: N]),
+                    .psum_in     (psum_bus[(r*COLS+c)*N +: N]),
                     .input_out   (act_bus[(r*(COLS+1)+c+1)*N +: N]),
                     .weight_out  (weight_out[(r*COLS+c)*N +: N]),
                     .product_out (product_out[(r*COLS+c)*N +: N]),
                     .mac_out     (mac_out[(r*COLS+c)*N +: N]),
+                    .psum_out    (psum_bus[((r+1)*COLS+c)*N +: N]),
                     .pe_output   (pe_output[(r*COLS+c)*N +: N])
                 );
             end
