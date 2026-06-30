@@ -1,8 +1,10 @@
 
+`timescale 1ns / 1ps
+
 //////////////////////////////////////////////////////////////////////////////////
 // Module Name: pe_quire
 // Description:
-//   Processing element using posit_quire_mac.
+//   Processing element with a local quire accumulation path.
 //
 //   Control and data movement match pe.v:
 //     - pe_en captures/forwards activation and enables accumulation
