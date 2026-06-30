@@ -1,23 +1,5 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 22.06.2026 15:03:21
-// Design Name: 
-// Module Name: posit_decoder
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
+
 module posit_decoder #(
     parameter N  = 8,
     parameter ES = 1
@@ -39,7 +21,6 @@ module posit_decoder #(
     integer run_length;
     integer exp_start;
     integer frac_start;
-    integer raw_frac_len;
 
     reg [N-1:0] mag;
     reg regime_bit;
@@ -60,7 +41,6 @@ module posit_decoder #(
         run_length = 0;
         exp_start  = 0;
         frac_start = 0;
-        raw_frac_len = 0;
 
         if (posit_in == {N{1'b0}}) begin
             is_zero = 1'b1;
@@ -109,18 +89,18 @@ module posit_decoder #(
             frac_start = exp_start + ES;
 
             if (frac_start < N) begin
-                raw_frac_len = N - frac_start;
-
                 // Trim zero padding left by the encoder after the valid bits.
-                for (i = 0; i < raw_frac_len; i = i + 1) begin
-                    if (mag[N-1-(frac_start+i)])
-                        frac_len = i + 1;
+                for (i = 0; i < N; i = i + 1) begin
+                    if ((i >= frac_start) && mag[N-1-i])
+                        frac_len = i - frac_start + 1;
                 end
 
                 // Store fraction left-justified:
                 // first fraction bit goes to fraction[N-1]
-                for (i = 0; i < frac_len; i = i + 1)
-                    fraction[N-1-i] = mag[N-1-(frac_start+i)];
+                for (i = 0; i < N; i = i + 1) begin
+                    if ((i >= frac_start) && (i < frac_start + frac_len))
+                        fraction[N-1-(i-frac_start)] = mag[N-1-i];
+                end
             end
         end
     end
