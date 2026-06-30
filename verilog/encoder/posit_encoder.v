@@ -1,24 +1,4 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date: 22.06.2026 15:18:23
-// Design Name: 
-// Module Name: posit_encoder
-// Project Name: 
-// Target Devices: 
-// Tool Versions: 
-// Description: 
-// 
-// Dependencies: 
-// 
-// Revision:
-// Revision 0.01 - File Created
-// Additional Comments:
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
 
 module posit_encoder #(
     parameter N  = 8,
@@ -65,8 +45,8 @@ module posit_encoder #(
             if (k >= 0) begin
                 reg_len = k + 1;
 
-                for (i = 0; i < reg_len; i = i + 1) begin
-                    if (idx >= 0) begin
+                for (i = 0; i < N; i = i + 1) begin
+                    if ((i < reg_len) && (idx >= 0)) begin
                         mag[idx] = 1'b1;
                         idx = idx - 1;
                     end
@@ -80,8 +60,8 @@ module posit_encoder #(
             else begin
                 reg_len = -k;
 
-                for (i = 0; i < reg_len; i = i + 1) begin
-                    if (idx >= 0) begin
+                for (i = 0; i < N; i = i + 1) begin
+                    if ((i < reg_len) && (idx >= 0)) begin
                         mag[idx] = 1'b0;
                         idx = idx - 1;
                     end
@@ -108,8 +88,8 @@ module posit_encoder #(
             // Decoder stores valid bits as fraction[N-1 : N-frac_len]
             // Example: 101 -> fraction = 10100000, frac_len = 3
             //--------------------------------------------------
-            for (i = 0; i < frac_len; i = i + 1) begin
-                if (idx >= 0) begin
+            for (i = 0; i < N; i = i + 1) begin
+                if ((i < frac_len) && (idx >= 0)) begin
                     mag[idx] = fraction[N-1-i];
                     idx = idx - 1;
                 end
