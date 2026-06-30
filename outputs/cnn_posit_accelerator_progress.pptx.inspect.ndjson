@@ -1,0 +1,191 @@
+{"kind":"deck","id":"pr/2hqn6n","name":"Deck"}
+{"kind":"layout","layoutId":"212a74cb-b9e3-4266-86c5-26a1b24293e1","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"554307ac-9a20-4696-9e72-8ebe101db85a","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/81ear2","slide":1,"title":"CNN Posit Accelerator","textShapes":12}
+{"kind":"textbox","id":"sh/xczed8v6","slide":1,"text":"CNN Posit Accelerator","textPreview":"CNN Posit Accelerator","textChars":21,"textLines":1,"bbox":[58,74,960,82]}
+{"kind":"textbox","id":"sh/qpg3ex0n","slide":1,"text":"Project progress, current verification status, and next build steps","textPreview":"Project progress, current verification status, and next build steps","textChars":67,"textLines":1,"bbox":[58,174,850,70]}
+{"kind":"shape","id":"sh/fa9w3m94","slide":1,"bbox":[58,322,1164,2]}
+{"kind":"textbox","id":"sh/8jqh0fep","slide":1,"text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[58,376,160,54]}
+{"kind":"textbox","id":"sh/x4nap4r6","slide":1,"text":"Arithmetic blocks implemented","textPreview":"Arithmetic blocks implemented","textChars":29,"textLines":1,"bbox":[58,434,210,46]}
+{"kind":"textbox","id":"sh/qd4vmtwr","slide":1,"text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[350,376,160,54]}
+{"kind":"textbox","id":"sh/fyxobm58","slide":1,"text":"MAC / PE layers started","textPreview":"MAC / PE layers started","textChars":23,"textLines":1,"bbox":[350,434,210,46]}
+{"kind":"textbox","id":"sh/87ed8bat","slide":1,"text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[645,376,160,54]}
+{"kind":"textbox","id":"sh/xs72x4na","slide":1,"text":"Systolic integration issues open","textPreview":"Systolic integration issues open","textChars":32,"textLines":1,"bbox":[645,434,210,46]}
+{"kind":"textbox","id":"sh/xkf6dcbu","slide":1,"text":"1","textPreview":"1","textChars":1,"textLines":1,"bbox":[965,376,160,54]}
+{"kind":"textbox","id":"sh/4zidonyd","slide":1,"text":"Primary next goal","textPreview":"Primary next goal","textChars":17,"textLines":1,"bbox":[965,434,210,46]}
+{"kind":"textbox","id":"sh/fepkzupw","slide":1,"text":"Focus: make the PE-to-array partial-sum interface compile and verify end-to-end.","textPreview":"Focus: make the PE-to-array partial-sum interface compile and verify end-to-end.","textChars":80,"textLines":1,"bbox":[58,574,1020,44]}
+{"kind":"textbox","id":"sh/mtwra5gb","slide":1,"text":"Project progress snapshot | 01","textPreview":"Project progress snapshot | 01","textChars":30,"textLines":1,"bbox":[58,668,400,24]}
+{"kind":"notes","id":"nt/81ear2","slide":1,"text":""}
+{"kind":"slide","id":"sl/5eda4a","slide":2,"title":"CNN POSIT ACCELERATOR","textShapes":19}
+{"kind":"textbox","id":"sh/g7adsji5","slide":2,"text":"CNN POSIT ACCELERATOR","textPreview":"CNN POSIT ACCELERATOR","textChars":21,"textLines":1,"bbox":[58,36,520,26]}
+{"kind":"textbox","id":"sh/rmhk3q5o","slide":2,"text":"Project objective","textPreview":"Project objective","textChars":17,"textLines":1,"bbox":[58,72,1080,62]}
+{"kind":"shape","id":"sh/y1kre1w7","slide":2,"bbox":[58,148,1164,1]}
+{"kind":"textbox","id":"sh/90je9cvi","slide":2,"text":"Build a hardware accelerator for CNN workloads using posit arithmetic, moving from verified arithmetic primitives into a systolic compute core.","textPreview":"Build a hardware accelerator for CNN workloads using posit arithmetic, moving from verified arithmetic primitives into a systolic compute...","textChars":143,"textLines":1,"bbox":[58,190,800,96]}
+{"kind":"shape","id":"sh/gfmlkjm1","slide":2,"bbox":[905,188,275,330]}
+{"kind":"textbox","id":"sh/rytsvu9k","slide":2,"text":"TARGET COMPUTE PATH","textPreview":"TARGET COMPUTE PATH","textChars":19,"textLines":1,"bbox":[936,220,220,22]}
+{"kind":"textbox","id":"sh/yd0z6103","slide":2,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[936,262,24,28]}
+{"kind":"textbox","id":"sh/9cvixcze","slide":2,"text":"Posit decode","textPreview":"Posit decode","textChars":12,"textLines":1,"bbox":[966,262,190,30]}
+{"kind":"textbox","id":"sh/gr2p8nqx","slide":2,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[936,304,24,28]}
+{"kind":"textbox","id":"sh/ahoza1gv","slide":2,"text":"Multiply","textPreview":"Multiply","textChars":8,"textLines":1,"bbox":[966,304,190,30]}
+{"kind":"textbox","id":"sh/32lszqtc","slide":2,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[936,346,24,28]}
+{"kind":"textbox","id":"sh/sneloj2t","slide":2,"text":"Accumulate","textPreview":"Accumulate","textChars":10,"textLines":1,"bbox":[966,346,190,30]}
+{"kind":"textbox","id":"sh/l87ed8ba","slide":2,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[936,388,24,28]}
+{"kind":"textbox","id":"sh/at47y1kr","slide":2,"text":"Quire option","textPreview":"Quire option","textChars":12,"textLines":1,"bbox":[966,388,190,30]}
+{"kind":"textbox","id":"sh/3ex0nuxc","slide":2,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[936,430,24,28]}
+{"kind":"textbox","id":"sh/szqtcj6t","slide":2,"text":"Array output","textPreview":"Array output","textChars":12,"textLines":1,"bbox":[966,430,190,30]}
+{"kind":"textbox","id":"sh/lkjm1cfa","slide":2,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[58,342,24,28]}
+{"kind":"textbox","id":"sh/ex0nuxc3","slide":2,"text":"Arithmetic precision is being explored through both rounded posit MAC and wide-quire MAC paths.","textPreview":"Arithmetic precision is being explored through both rounded posit MAC and wide-quire MAC paths.","textChars":95,"textLines":1,"bbox":[88,342,730,30]}
+{"kind":"textbox","id":"sh/3itgfmlk","slide":2,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[58,400,24,28]}
+{"kind":"textbox","id":"sh/vahoza1g","slide":2,"text":"The project has advanced beyond isolated modules into PE and systolic-array composition.","textPreview":"The project has advanced beyond isolated modules into PE and systolic-array composition.","textChars":88,"textLines":1,"bbox":[88,400,730,30]}
+{"kind":"textbox","id":"sh/6tovahoz","slide":2,"text":"Project progress snapshot | 02","textPreview":"Project progress snapshot | 02","textChars":30,"textLines":1,"bbox":[58,668,400,24]}
+{"kind":"notes","id":"nt/5eda4a","slide":2,"text":""}
+{"kind":"slide","id":"sl/7gko9e","slide":3,"title":"CNN POSIT ACCELERATOR","textShapes":38}
+{"kind":"textbox","id":"sh/szqtcj6t","slide":3,"text":"CNN POSIT ACCELERATOR","textPreview":"CNN POSIT ACCELERATOR","textChars":21,"textLines":1,"bbox":[58,36,520,26]}
+{"kind":"textbox","id":"sh/3ex0nuxc","slide":3,"text":"Repository progress map","textPreview":"Repository progress map","textChars":23,"textLines":1,"bbox":[58,72,1080,62]}
+{"kind":"shape","id":"sh/at47y1kr","slide":3,"bbox":[58,148,1164,1]}
+{"kind":"shape","id":"sh/l87ed8ba","slide":3,"bbox":[58,206,244,330]}
+{"kind":"textbox","id":"sh/sneloj2t","slide":3,"text":"Reference","textPreview":"Reference","textChars":9,"textLines":1,"bbox":[80,230,200,34]}
+{"kind":"textbox","id":"sh/32lszqtc","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[80,292,24,28]}
+{"kind":"textbox","id":"sh/ahoza1gv","slide":3,"text":"posit_encoder.py","textPreview":"posit_encoder.py","textChars":16,"textLines":1,"bbox":[110,292,175,30]}
+{"kind":"textbox","id":"sh/lwval87e","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[80,330,24,28]}
+{"kind":"textbox","id":"sh/wb2hwfyx","slide":3,"text":"posit_decoder.py","textPreview":"posit_decoder.py","textChars":16,"textLines":1,"bbox":[110,330,175,30]}
+{"kind":"textbox","id":"sh/2lszqtcj","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[80,368,24,28]}
+{"kind":"textbox","id":"sh/v6psfil0","slide":3,"text":"test vectors","textPreview":"test vectors","textChars":12,"textLines":1,"bbox":[110,368,175,30]}
+{"kind":"shape","id":"sh/knih4byh","slide":3,"bbox":[348,206,244,330]}
+{"kind":"textbox","id":"sh/d8bat47y","slide":3,"text":"Arithmetic","textPreview":"Arithmetic","textChars":10,"textLines":1,"bbox":[370,230,200,34]}
+{"kind":"textbox","id":"sh/29gr2p8n","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[370,292,24,28]}
+{"kind":"textbox","id":"sh/vu9knih4","slide":3,"text":"posit_decoder.v","textPreview":"posit_decoder.v","textChars":15,"textLines":1,"bbox":[400,292,175,30]}
+{"kind":"textbox","id":"sh/kf6dcbul","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[370,330,24,28]}
+{"kind":"textbox","id":"sh/d0z61032","slide":3,"text":"posit_encoder.v","textPreview":"posit_encoder.v","textChars":15,"textLines":1,"bbox":[400,330,175,30]}
+{"kind":"textbox","id":"sh/2x4nap4r","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[370,368,24,28]}
+{"kind":"textbox","id":"sh/vixczed8","slide":3,"text":"posit_multiplier.v","textPreview":"posit_multiplier.v","textChars":18,"textLines":1,"bbox":[400,368,175,30]}
+{"kind":"textbox","id":"sh/neloj2t8","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[370,406,24,28]}
+{"kind":"textbox","id":"sh/ytsvu9kn","slide":3,"text":"posit_adder.v","textPreview":"posit_adder.v","textChars":13,"textLines":1,"bbox":[400,406,175,30]}
+{"kind":"shape","id":"sh/5kb6xkf6","slide":3,"bbox":[638,206,244,330]}
+{"kind":"textbox","id":"sh/czed8v6p","slide":3,"text":"Compute","textPreview":"Compute","textChars":7,"textLines":1,"bbox":[660,230,200,34]}
+{"kind":"textbox","id":"sh/nqxs72x4","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[660,292,24,28]}
+{"kind":"textbox","id":"sh/u54zidon","slide":3,"text":"posit_mac.v","textPreview":"posit_mac.v","textChars":11,"textLines":1,"bbox":[690,292,175,30]}
+{"kind":"textbox","id":"sh/5sneloj2","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[660,330,24,28]}
+{"kind":"textbox","id":"sh/cbulwval","slide":3,"text":"posit_quire_mac.v","textPreview":"posit_quire_mac.v","textChars":17,"textLines":1,"bbox":[690,330,175,30]}
+{"kind":"textbox","id":"sh/nuxc3ylc","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[660,368,24,28]}
+{"kind":"textbox","id":"sh/y90je9cv","slide":3,"text":"pe.v","textPreview":"pe.v","textChars":4,"textLines":1,"bbox":[690,368,175,30]}
+{"kind":"textbox","id":"sh/87ed8bat","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[660,406,24,28]}
+{"kind":"textbox","id":"sh/xs72x4na","slide":3,"text":"pe_quire.v","textPreview":"pe_quire.v","textChars":10,"textLines":1,"bbox":[690,406,175,30]}
+{"kind":"shape","id":"sh/q1orytsv","slide":3,"bbox":[930,206,244,330]}
+{"kind":"textbox","id":"sh/fmlkjm1c","slide":3,"text":"System","textPreview":"System","textChars":6,"textLines":1,"bbox":[952,230,200,34]}
+{"kind":"textbox","id":"sh/8z25kb6x","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[952,292,24,28]}
+{"kind":"textbox","id":"sh/1gvy90je","slide":3,"text":"input_fifo.v","textPreview":"input_fifo.v","textChars":12,"textLines":1,"bbox":[982,292,175,30]}
+{"kind":"textbox","id":"sh/qtcj6tov","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[952,330,24,28]}
+{"kind":"textbox","id":"sh/je9cvixc","slide":3,"text":"output_fifo.v","textPreview":"output_fifo.v","textChars":13,"textLines":1,"bbox":[982,330,175,30]}
+{"kind":"textbox","id":"sh/8v6psfil","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[952,368,24,28]}
+{"kind":"textbox","id":"sh/xczed8v6","slide":3,"text":"systolic_array*.v","textPreview":"systolic_array*.v","textChars":17,"textLines":1,"bbox":[982,368,175,30]}
+{"kind":"textbox","id":"sh/9knih4by","slide":3,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[952,406,24,28]}
+{"kind":"textbox","id":"sh/kzupwb2h","slide":3,"text":"systolic_core*.v","textPreview":"systolic_core*.v","textChars":16,"textLines":1,"bbox":[982,406,175,30]}
+{"kind":"textbox","id":"sh/re1w7mp0","slide":3,"text":"Status: the lower layers are mostly in place; the top-level systolic hierarchy needs interface cleanup.","textPreview":"Status: the lower layers are mostly in place; the top-level systolic hierarchy needs interface cleanup.","textChars":103,"textLines":1,"bbox":[58,585,1060,34]}
+{"kind":"textbox","id":"sh/2t83itgf","slide":3,"text":"Project progress snapshot | 03","textPreview":"Project progress snapshot | 03","textChars":30,"textLines":1,"bbox":[58,668,400,24]}
+{"kind":"notes","id":"nt/7gko9e","slide":3,"text":""}
+{"kind":"slide","id":"sl/m9xzl0","slide":4,"title":"CNN POSIT ACCELERATOR","textShapes":14}
+{"kind":"textbox","id":"sh/a5gbq1or","slide":4,"text":"CNN POSIT ACCELERATOR","textPreview":"CNN POSIT ACCELERATOR","textChars":21,"textLines":1,"bbox":[58,36,520,26]}
+{"kind":"textbox","id":"sh/lszqtcj6","slide":4,"text":"Arithmetic datapath is in place","textPreview":"Arithmetic datapath is in place","textChars":31,"textLines":1,"bbox":[58,72,1080,62]}
+{"kind":"shape","id":"sh/s72x4nap","slide":4,"bbox":[58,148,1164,1]}
+{"kind":"shape","id":"sh/3ylc7u54","slide":4,"bbox":[82,245,160,92]}
+{"kind":"textbox","id":"sh/adsji5sn","slide":4,"text":"posit input","textPreview":"posit input","textChars":11,"textLines":1,"bbox":[96,273,132,34]}
+{"kind":"textbox","id":"sh/h4byhgn2","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[256,269,70,46]}
+{"kind":"shape","id":"sh/sji5snel","slide":4,"bbox":[306,245,160,92]}
+{"kind":"textbox","id":"sh/za1gvy90","slide":4,"text":"decoder","textPreview":"decoder","textChars":7,"textLines":1,"bbox":[320,273,132,34]}
+{"kind":"textbox","id":"sh/ap4r65wj","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[480,269,70,46]}
+{"kind":"shape","id":"sh/0je9cvix","slide":4,"bbox":[530,245,160,92]}
+{"kind":"textbox","id":"sh/t47y1kre","slide":4,"text":"mul / add","textPreview":"mul / add","textChars":9,"textLines":1,"bbox":[544,273,132,34]}
+{"kind":"textbox","id":"sh/idonyd0z","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[704,269,70,46]}
+{"kind":"shape","id":"sh/byhgn29g","slide":4,"bbox":[754,245,160,92]}
+{"kind":"textbox","id":"sh/0rqd4vmt","slide":4,"text":"encoder","textPreview":"encoder","textChars":7,"textLines":1,"bbox":[768,273,132,34]}
+{"kind":"textbox","id":"sh/tcj6tova","slide":4,"text":"→","textPreview":"→","textChars":1,"textLines":1,"bbox":[928,269,70,46]}
+{"kind":"shape","id":"sh/il0rqd4v","slide":4,"bbox":[978,245,160,92]}
+{"kind":"textbox","id":"sh/b6xkf6dc","slide":4,"text":"posit output","textPreview":"posit output","textChars":12,"textLines":1,"bbox":[992,273,132,34]}
+{"kind":"shape","id":"sh/032lszqt","slide":4,"bbox":[160,422,960,80]}
+{"kind":"textbox","id":"sh/tovahoza","slide":4,"text":"Quire MAC path","textPreview":"Quire MAC path","textChars":14,"textLines":1,"bbox":[190,440,250,30]}
+{"kind":"textbox","id":"sh/tgfmlkjm","slide":4,"text":"Products are accumulated in a wide fixed-point quire, then converted back to posit only at output. This avoids repeated rounding inside long dot products.","textPreview":"Products are accumulated in a wide fixed-point quire, then converted back to posit only at output. This avoids repeated rounding inside l...","textChars":154,"textLines":1,"bbox":[430,435,635,44]}
+{"kind":"textbox","id":"sh/4vmtwra5","slide":4,"text":"Project progress snapshot | 04","textPreview":"Project progress snapshot | 04","textChars":30,"textLines":1,"bbox":[58,668,400,24]}
+{"kind":"notes","id":"nt/m9xzl0","slide":4,"text":""}
+{"kind":"slide","id":"sl/n2yyfr","slide":5,"title":"CNN POSIT ACCELERATOR","textShapes":12}
+{"kind":"textbox","id":"sh/sfil0rqd","slide":5,"text":"CNN POSIT ACCELERATOR","textPreview":"CNN POSIT ACCELERATOR","textChars":21,"textLines":1,"bbox":[58,36,520,26]}
+{"kind":"textbox","id":"sh/zupwb2hw","slide":5,"text":"Verification status from local testbenches","textPreview":"Verification status from local testbenches","textChars":42,"textLines":1,"bbox":[58,72,1080,62]}
+{"kind":"shape","id":"sh/a9w3m94f","slide":5,"bbox":[58,148,1164,1]}
+{"kind":"textbox","id":"sh/orytsvu9","slide":5,"text":"INTERPRETATION","textPreview":"INTERPRETATION","textChars":14,"textLines":1,"bbox":[680,212,420,22]}
+{"kind":"textbox","id":"sh/z61032ls","slide":5,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[680,250,24,28]}
+{"kind":"textbox","id":"sh/al87ed8b","slide":5,"text":"posit_mac testbench passes the checked accumulation cases.","textPreview":"posit_mac testbench passes the checked accumulation cases.","textChars":58,"textLines":1,"bbox":[710,250,470,30]}
+{"kind":"textbox","id":"sh/hk3q5o7q","slide":5,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[680,297,24,28]}
+{"kind":"textbox","id":"sh/oza1gvy9","slide":5,"text":"input/output FIFO tests pass reset, write, read, wrap, and clear behavior.","textPreview":"input/output FIFO tests pass reset, write, read, wrap, and clear behavior.","textChars":74,"textLines":1,"bbox":[710,297,470,30]}
+{"kind":"textbox","id":"sh/29gr2p8n","slide":5,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[680,344,24,28]}
+{"kind":"textbox","id":"sh/vu9knih4","slide":5,"text":"PE tests compile but fail expected timing/output checks.","textPreview":"PE tests compile but fail expected timing/output checks.","textChars":56,"textLines":1,"bbox":[710,344,470,30]}
+{"kind":"textbox","id":"sh/kf6dcbul","slide":5,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[680,391,24,28]}
+{"kind":"textbox","id":"sh/d0z61032","slide":5,"text":"Systolic array/core elaboration fails due to missing partial-sum ports.","textPreview":"Systolic array/core elaboration fails due to missing partial-sum ports.","textChars":71,"textLines":1,"bbox":[710,391,470,30]}
+{"kind":"textbox","id":"sh/2lszqtcj","slide":5,"text":"Project progress snapshot | 05","textPreview":"Project progress snapshot | 05","textChars":30,"textLines":1,"bbox":[58,668,400,24]}
+{"kind":"chart","id":"ch/psfil0rq","slide":5,"name":"","chartType":"bar","bbox":[86,220,520,310]}
+{"kind":"notes","id":"nt/n2yyfr","slide":5,"text":""}
+{"kind":"slide","id":"sl/v4twu7","slide":6,"title":"CNN POSIT ACCELERATOR","textShapes":19}
+{"kind":"textbox","id":"sh/vixczed8","slide":6,"text":"CNN POSIT ACCELERATOR","textPreview":"CNN POSIT ACCELERATOR","textChars":21,"textLines":1,"bbox":[58,36,520,26]}
+{"kind":"textbox","id":"sh/k3q5o7qp","slide":6,"text":"Systolic compute hierarchy has been started","textPreview":"Systolic compute hierarchy has been started","textChars":43,"textLines":1,"bbox":[58,72,1080,62]}
+{"kind":"shape","id":"sh/donyd0z6","slide":6,"bbox":[58,148,1164,1]}
+{"kind":"textbox","id":"sh/6psfil0r","slide":6,"text":"01","textPreview":"01","textChars":2,"textLines":1,"bbox":[58,210,60,42]}
+{"kind":"textbox","id":"sh/val87ed8","slide":6,"text":"Input FIFOs","textPreview":"Input FIFOs","textChars":11,"textLines":1,"bbox":[132,214,300,34]}
+{"kind":"textbox","id":"sh/kre1w7mp","slide":6,"text":"Buffers activations per row","textPreview":"Buffers activations per row","textChars":27,"textLines":1,"bbox":[480,218,560,28]}
+{"kind":"shape","id":"sh/dcbulwva","slide":6,"bbox":[1110,216,72,24]}
+{"kind":"textbox","id":"sh/2lszqtcj","slide":6,"text":"OK","textPreview":"OK","textChars":2,"textLines":1,"bbox":[1110,215,72,24]}
+{"kind":"textbox","id":"sh/v6psfil0","slide":6,"text":"02","textPreview":"02","textChars":2,"textLines":1,"bbox":[58,292,60,42]}
+{"kind":"textbox","id":"sh/bq1oryts","slide":6,"text":"Skew / row delay","textPreview":"Skew / row delay","textChars":16,"textLines":1,"bbox":[132,296,300,34]}
+{"kind":"textbox","id":"sh/m58z25kb","slide":6,"text":"Offsets rows for systolic timing","textPreview":"Offsets rows for systolic timing","textChars":32,"textLines":1,"bbox":[480,300,560,28]}
+{"kind":"shape","id":"sh/twra5gbq","slide":6,"bbox":[1110,298,72,24]}
+{"kind":"textbox","id":"sh/4byhgn29","slide":6,"text":"OK","textPreview":"OK","textChars":2,"textLines":1,"bbox":[1110,297,72,24]}
+{"kind":"textbox","id":"sh/b2hwfyxo","slide":6,"text":"03","textPreview":"03","textChars":2,"textLines":1,"bbox":[58,374,60,42]}
+{"kind":"textbox","id":"sh/mhk3q5o7","slide":6,"text":"PE array","textPreview":"PE array","textChars":8,"textLines":1,"bbox":[132,378,300,34]}
+{"kind":"textbox","id":"sh/t83itgfm","slide":6,"text":"Instantiates PE grid","textPreview":"Instantiates PE grid","textChars":20,"textLines":1,"bbox":[480,382,560,28]}
+{"kind":"shape","id":"sh/4nap4r65","slide":6,"bbox":[1110,380,72,24]}
+{"kind":"textbox","id":"sh/bat47y1k","slide":6,"text":"WIP","textPreview":"WIP","textChars":3,"textLines":1,"bbox":[1110,379,72,24]}
+{"kind":"textbox","id":"sh/mp0bi9s3","slide":6,"text":"04","textPreview":"04","textChars":2,"textLines":1,"bbox":[58,456,60,42]}
+{"kind":"textbox","id":"sh/uxc3ylc7","slide":6,"text":"Output alignment","textPreview":"Output alignment","textChars":16,"textLines":1,"bbox":[132,460,300,34]}
+{"kind":"textbox","id":"sh/ji5snelo","slide":6,"text":"Delays columns for output sync","textPreview":"Delays columns for output sync","textChars":30,"textLines":1,"bbox":[480,464,560,28]}
+{"kind":"shape","id":"sh/c3ylc7u5","slide":6,"bbox":[1110,462,72,24]}
+{"kind":"textbox","id":"sh/1kre1w7m","slide":6,"text":"WIP","textPreview":"WIP","textChars":3,"textLines":1,"bbox":[1110,461,72,24]}
+{"kind":"textbox","id":"sh/ulwval87","slide":6,"text":"Project progress snapshot | 06","textPreview":"Project progress snapshot | 06","textChars":30,"textLines":1,"bbox":[58,668,400,24]}
+{"kind":"notes","id":"nt/v4twu7","slide":6,"text":""}
+{"kind":"slide","id":"sl/7b2pkm","slide":7,"title":"CNN POSIT ACCELERATOR","textShapes":14}
+{"kind":"textbox","id":"sh/nih4byhg","slide":7,"text":"CNN POSIT ACCELERATOR","textPreview":"CNN POSIT ACCELERATOR","textChars":21,"textLines":1,"bbox":[58,36,520,26]}
+{"kind":"textbox","id":"sh/g3ex0nux","slide":7,"text":"Current blockers","textPreview":"Current blockers","textChars":16,"textLines":1,"bbox":[58,72,1080,62]}
+{"kind":"shape","id":"sh/5o7qpg3e","slide":7,"bbox":[58,148,1164,1]}
+{"kind":"shape","id":"sh/ylc7u54z","slide":7,"bbox":[58,205,540,285]}
+{"kind":"textbox","id":"sh/r65wjudg","slide":7,"text":"Interface mismatch","textPreview":"Interface mismatch","textChars":18,"textLines":1,"bbox":[86,232,440,34]}
+{"kind":"textbox","id":"sh/gr2p8nqx","slide":7,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[86,292,24,28]}
+{"kind":"textbox","id":"sh/9cvixcze","slide":7,"text":"Core and testbenches expect psum_out style ports.","textPreview":"Core and testbenches expect psum_out style ports.","textChars":49,"textLines":1,"bbox":[116,292,440,30]}
+{"kind":"textbox","id":"sh/yd0z6103","slide":7,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[86,342,24,28]}
+{"kind":"textbox","id":"sh/rytsvu9k","slide":7,"text":"Array modules currently expose PE outputs but not the expected column partial-sum ports.","textPreview":"Array modules currently expose PE outputs but not the expected column partial-sum ports.","textChars":88,"textLines":1,"bbox":[116,342,440,30]}
+{"kind":"shape","id":"sh/bi9s36hc","slide":7,"bbox":[682,205,540,285]}
+{"kind":"textbox","id":"sh/ixczed8v","slide":7,"text":"Pipeline expectation","textPreview":"Pipeline expectation","textChars":20,"textLines":1,"bbox":[710,232,440,34]}
+{"kind":"textbox","id":"sh/tovahoza","slide":7,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[710,292,24,28]}
+{"kind":"textbox","id":"sh/032lszqt","slide":7,"text":"PE test expectations do not match the registered two-stage datapath.","textPreview":"PE test expectations do not match the registered two-stage datapath.","textChars":68,"textLines":1,"bbox":[740,292,440,30]}
+{"kind":"textbox","id":"sh/bulwval8","slide":7,"text":"•","textPreview":"•","textChars":1,"textLines":1,"bbox":[710,342,24,28]}
+{"kind":"textbox","id":"sh/i9s36hcr","slide":7,"text":"Need to decide whether to change PE timing or update tests around intended latency.","textPreview":"Need to decide whether to change PE timing or update tests around intended latency.","textChars":83,"textLines":1,"bbox":[740,342,440,30]}
+{"kind":"textbox","id":"sh/p0bi9s36","slide":7,"text":"These are integration issues, not a sign that the whole project needs to restart.","textPreview":"These are integration issues, not a sign that the whole project needs to restart.","textChars":81,"textLines":1,"bbox":[58,575,1000,34]}
+{"kind":"textbox","id":"sh/0fepkzup","slide":7,"text":"Project progress snapshot | 07","textPreview":"Project progress snapshot | 07","textChars":30,"textLines":1,"bbox":[58,668,400,24]}
+{"kind":"notes","id":"nt/7b2pkm","slide":7,"text":""}
+{"kind":"slide","id":"sl/rj53ki","slide":8,"title":"CNN POSIT ACCELERATOR","textShapes":18}
+{"kind":"textbox","id":"sh/2hwfyxob","slide":8,"text":"CNN POSIT ACCELERATOR","textPreview":"CNN POSIT ACCELERATOR","textChars":21,"textLines":1,"bbox":[58,36,520,26]}
+{"kind":"textbox","id":"sh/94fu18jq","slide":8,"text":"Next build steps","textPreview":"Next build steps","textChars":16,"textLines":1,"bbox":[58,72,1080,62]}
+{"kind":"shape","id":"sh/kjm1cfa9","slide":8,"bbox":[58,148,1164,1]}
+{"kind":"textbox","id":"sh/ra5gbq1o","slide":8,"text":"1","textPreview":"1","textChars":1,"textLines":1,"bbox":[58,190,58,44]}
+{"kind":"textbox","id":"sh/2p8nqxs7","slide":8,"text":"Lock PE contract","textPreview":"Lock PE contract","textChars":16,"textLines":1,"bbox":[135,192,270,32]}
+{"kind":"textbox","id":"sh/9gr2p8nq","slide":8,"text":"Choose exact partial-sum direction, latency, and whether the quire PE or rounded PE is the main path.","textPreview":"Choose exact partial-sum direction, latency, and whether the quire PE or rounded PE is the main path.","textChars":101,"textLines":1,"bbox":[430,194,720,40]}
+{"kind":"textbox","id":"sh/gvy90je9","slide":8,"text":"2","textPreview":"2","textChars":1,"textLines":1,"bbox":[58,272,58,44]}
+{"kind":"textbox","id":"sh/re1w7mp0","slide":8,"text":"Fix array ports","textPreview":"Fix array ports","textChars":15,"textLines":1,"bbox":[135,274,270,32]}
+{"kind":"textbox","id":"sh/2t83itgf","slide":8,"text":"Expose column psum outputs from systolic_array and systolic_array_quire.","textPreview":"Expose column psum outputs from systolic_array and systolic_array_quire.","textChars":72,"textLines":1,"bbox":[430,276,720,40]}
+{"kind":"textbox","id":"sh/sneloj2t","slide":8,"text":"3","textPreview":"3","textChars":1,"textLines":1,"bbox":[58,354,58,44]}
+{"kind":"textbox","id":"sh/l87ed8ba","slide":8,"text":"Rebaseline tests","textPreview":"Rebaseline tests","textChars":16,"textLines":1,"bbox":[135,356,270,32]}
+{"kind":"textbox","id":"sh/ahoza1gv","slide":8,"text":"Update PE and array testbenches to the chosen pipeline timing.","textPreview":"Update PE and array testbenches to the chosen pipeline timing.","textChars":62,"textLines":1,"bbox":[430,358,720,40]}
+{"kind":"textbox","id":"sh/32lszqtc","slide":8,"text":"4","textPreview":"4","textChars":1,"textLines":1,"bbox":[58,436,58,44]}
+{"kind":"textbox","id":"sh/szqtcj6t","slide":8,"text":"Add controller","textPreview":"Add controller","textChars":14,"textLines":1,"bbox":[135,438,270,32]}
+{"kind":"textbox","id":"sh/lkjm1cfa","slide":8,"text":"Create top-level FSM for load weights, stream activations, compute, and drain outputs.","textPreview":"Create top-level FSM for load weights, stream activations, compute, and drain outputs.","textChars":86,"textLines":1,"bbox":[430,440,720,40]}
+{"kind":"textbox","id":"sh/at47y1kr","slide":8,"text":"5","textPreview":"5","textChars":1,"textLines":1,"bbox":[58,518,58,44]}
+{"kind":"textbox","id":"sh/3ex0nuxc","slide":8,"text":"CNN layer demo","textPreview":"CNN layer demo","textChars":14,"textLines":1,"bbox":[135,520,270,32]}
+{"kind":"textbox","id":"sh/w3m94fu1","slide":8,"text":"Run one small convolution or matrix-multiply case against Python reference data.","textPreview":"Run one small convolution or matrix-multiply case against Python reference data.","textChars":80,"textLines":1,"bbox":[430,522,720,40]}
+{"kind":"textbox","id":"sh/loj2t83i","slide":8,"text":"Project progress snapshot | 08","textPreview":"Project progress snapshot | 08","textChars":30,"textLines":1,"bbox":[58,668,400,24]}
+{"kind":"notes","id":"nt/rj53ki","slide":8,"text":""}
