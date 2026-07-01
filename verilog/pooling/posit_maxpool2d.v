@@ -60,7 +60,7 @@ module posit_maxpool2d #(
 
     // For finite posit values, signed integer ordering follows numeric order.
     // NaR is handled before comparison.
-    function is_greater_posit;
+    function [0:0] is_greater_posit;
         input [N-1:0] a;
         input [N-1:0] b;
         begin
