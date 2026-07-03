@@ -5,7 +5,7 @@ module systolic_array_quire #(
     parameter ES = 1,
     parameter ROWS = 6,
     parameter COLS = 6,
-    parameter QW = 128,
+    parameter QW = 48,
     parameter QF = QW / 2
 )(
     input  wire                         clk,
@@ -48,29 +48,58 @@ module systolic_array_quire #(
             assign activation_out[r*N +: N] = act_bus[(r*(COLS+1)+COLS)*N +: N];
 
             for (c = 0; c < COLS; c = c + 1) begin : COL_GEN
-                pe_quire #(
-                    .N(N),
-                    .ES(ES),
-                    .QW(QW),
-                    .QF(QF)
-                ) PE_QUIRE_INST (
-                    .clk       (clk),
-                    .reset     (reset),
-                    .pe_en     (pe_en),
-                    .clear_acc (clear_acc),
-                    .wshift    (wshift),
-                    .input_in  (act_bus[(r*(COLS+1)+c)*N +: N]),
-                    .weight_in (weight_in[(r*COLS+c)*N +: N]),
-                    .psum_in   (psum_bus[(r*COLS+c)*QW +: QW]),
-                    .psum_nar_in(psum_nar_bus[r*COLS+c]),
-                    .input_out (act_bus[(r*(COLS+1)+c+1)*N +: N]),
-                    .weight_out(weight_out[(r*COLS+c)*N +: N]),
-                    .quire_out (quire_out[(r*COLS+c)*QW +: QW]),
-                    .is_nar    (is_nar[r*COLS+c]),
-                    .psum_out  (psum_bus[((r+1)*COLS+c)*QW +: QW]),
-                    .psum_nar_out(psum_nar_bus[(r+1)*COLS+c]),
-                    .pe_output (pe_output[(r*COLS+c)*N +: N])
-                );
+                if (r == ROWS-1) begin : BOTTOM_ROW_PE
+                    pe_quire #(
+                        .N(N),
+                        .ES(ES),
+                        .QW(QW),
+                        .QF(QF)
+                    ) PE_QUIRE_INST (
+                        .clk          (clk),
+                        .reset        (reset),
+                        .pe_en        (pe_en),
+                        .clear_acc    (clear_acc),
+                        .wshift       (wshift),
+                        .input_in     (act_bus[(r*(COLS+1)+c)*N +: N]),
+                        .weight_in    (weight_in[(r*COLS+c)*N +: N]),
+                        .psum_in      (psum_bus[(r*COLS+c)*QW +: QW]),
+                        .psum_nar_in  (psum_nar_bus[r*COLS+c]),
+                        .input_out    (act_bus[(r*(COLS+1)+c+1)*N +: N]),
+                        .weight_out   (weight_out[(r*COLS+c)*N +: N]),
+                        .quire_out    (quire_out[(r*COLS+c)*QW +: QW]),
+                        .is_nar       (is_nar[r*COLS+c]),
+                        .psum_out     (psum_bus[((r+1)*COLS+c)*QW +: QW]),
+                        .psum_nar_out (psum_nar_bus[(r+1)*COLS+c]),
+                        .pe_output    (pe_output[(r*COLS+c)*N +: N])
+                    );
+                end
+                else begin : INTERNAL_ROW_PE
+                    assign pe_output[(r*COLS+c)*N +: N] = {N{1'b0}};
+
+                    pe_quire #(
+                        .N(N),
+                        .ES(ES),
+                        .QW(QW),
+                        .QF(QF)
+                    ) PE_QUIRE_INST (
+                        .clk          (clk),
+                        .reset        (reset),
+                        .pe_en        (pe_en),
+                        .clear_acc    (clear_acc),
+                        .wshift       (wshift),
+                        .input_in     (act_bus[(r*(COLS+1)+c)*N +: N]),
+                        .weight_in    (weight_in[(r*COLS+c)*N +: N]),
+                        .psum_in      (psum_bus[(r*COLS+c)*QW +: QW]),
+                        .psum_nar_in  (psum_nar_bus[r*COLS+c]),
+                        .input_out    (act_bus[(r*(COLS+1)+c+1)*N +: N]),
+                        .weight_out   (weight_out[(r*COLS+c)*N +: N]),
+                        .quire_out    (quire_out[(r*COLS+c)*QW +: QW]),
+                        .is_nar       (is_nar[r*COLS+c]),
+                        .psum_out     (psum_bus[((r+1)*COLS+c)*QW +: QW]),
+                        .psum_nar_out (psum_nar_bus[(r+1)*COLS+c]),
+                        .pe_output    ()
+                    );
+                end
             end
         end
     endgenerate
