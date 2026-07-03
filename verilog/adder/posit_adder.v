@@ -57,7 +57,7 @@ module posit_adder #(
     // Internal arithmetic widths
     // --------------------------------------------------
     localparam integer SIG_W   = N + 1;          // hidden 1 + N fraction bits
-    localparam integer WORK_W  = (4*N) + 16;     // enough headroom for add/normalize
+    localparam integer WORK_W  = (2*N) + 4;      // enough headroom for aligned add/normalize
     localparam integer SCALE_W = $clog2(N) + ES + 4;
 
     // --------------------------------------------------
@@ -124,7 +124,7 @@ module posit_adder #(
 
     reg signed [WORK_W-1:0] signed_a;
     reg signed [WORK_W-1:0] signed_b;
-    reg signed [WORK_W-1:0] sum_signed;
+    (* use_dsp = "yes" *) reg signed [WORK_W-1:0] sum_signed;
 
     reg [WORK_W-1:0] abs_sum;
     reg [WORK_W-1:0] norm_sum;
@@ -134,7 +134,7 @@ module posit_adder #(
     integer norm_shift;
     integer lead_pos;
     integer i;
-    integer last_one;
+    
 
     // --------------------------------------------------
     // Helper function: highest set bit position
@@ -185,7 +185,7 @@ module posit_adder #(
         shift_b      = 0;
         norm_shift   = 0;
         lead_pos     = -1;
-        last_one     = -1;
+        
 
         // --------------------------------------------------
         // Special cases
@@ -217,8 +217,8 @@ module posit_adder #(
             // Convert decode fields to a common scale
             // scale = k * 2^ES + exponent
             // --------------------------------------------------
-            scale_a = (k_a <<< ES) + exponent_a;
-            scale_b = (k_b <<< ES) + exponent_b;
+            scale_a = (k_a <<< ES) + $signed({1'b0, exponent_a});
+            scale_b = (k_b <<< ES) + $signed({1'b0, exponent_b});
 
             // Significand with hidden bit:
             // 1.fraction, stored as an integer with binary point after bit N
