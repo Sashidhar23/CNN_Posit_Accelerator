@@ -1,17 +1,22 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
+// Company:
+// Engineer:
+//
+// Create Date: 24.06.2026
+// Design Name:
 // Module Name: tb_posit_multiplier
+// Project Name:
+// Target Devices:
+// Tool Versions:
 // Description:
-//   Testbench for posit_multiplier<8,1>.
 //
-//   Strategy:
-//     - Special-case tests  (zero, NaR)
-//     - Known-value tests   (hand-calculated expected outputs)
-//     - Exhaustive identity test: for every posit p, p * (+1) must equal p
-//     - Commutativity sweep: for a random sample of pairs, a*b == b*a
+// Dependencies:
 //
-//   Expected values for the known-value tests were derived from the posit<8,1>
-//   standard and verified against softposit / the Python posit library.
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+//
 //////////////////////////////////////////////////////////////////////////////////
 
 module tb_posit_multiplier;
