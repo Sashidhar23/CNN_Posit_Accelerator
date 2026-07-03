@@ -44,6 +44,17 @@ module tb_conv2D_quire;
         .clk(clk),
         .reset(reset),
         .start(start),
+        .ext_input_write_en(1'b0),
+        .ext_input_addr(32'd0),
+        .ext_input_data({N{1'b0}}),
+        .ext_weight_write_en(1'b0),
+        .ext_weight_addr(32'd0),
+        .ext_weight_data({N{1'b0}}),
+        .ext_bias_write_en(1'b0),
+        .ext_bias_addr(32'd0),
+        .ext_bias_data({N{1'b0}}),
+        .ext_output_addr(32'd0),
+        .ext_output_data(),
         .busy(busy),
         .done(done)
     );
