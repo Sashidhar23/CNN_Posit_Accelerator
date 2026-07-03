@@ -1,29 +1,24 @@
 `timescale 1ns / 1ps
 //////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 24.06.2026 12:02:42
+// Design Name: 
 // Module Name: posit_multiplier
-// Description:
-//   Parametric posit multiplier for posit<N, ES>.
-//
-//   Algorithm:
-//     1.  Decode both inputs via posit_decoder instances.
-//     2.  Special-case: zero * anything = 0,  NaR * anything = NaR.
-//     3.  Sign   : sign_out = sign_a ^ sign_b
-//     4.  Regime + Exponent:
-//           total_exp_a = k_a * 2^ES + exp_a
-//           total_exp_b = k_b * 2^ES + exp_b
-//           total_exp   = total_exp_a + total_exp_b   (added *before* fraction carry)
-//     5.  Fraction:
-//           Represent each operand as a 1.fraction fixed-point value with
-//           (N+1) integer+fraction bits:  {1, fraction[N-1 : N-frac_len]}  left-justified.
-//           Product is (N+2) bits wide; the implicit leading 1s multiply to give
-//           a result that is either 1x.xxx... or 1.xxx...
-//           If the product MSB (bit 2N+1) is set the result is >= 2, so we
-//           normalise by shifting right one and incrementing total_exp.
-//     6.  Split normalised total_exp back into k_out and exp_out.
-//     7.  Encode via posit_encoder.
-//
-//   Rounding: truncation (round toward zero) on the fraction product.
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
 //////////////////////////////////////////////////////////////////////////////////
+
 
 module posit_multiplier #(
     parameter N  = 8,
@@ -134,7 +129,21 @@ module posit_multiplier #(
     reg [MANT_W-1:0] mant_a;
     reg [MANT_W-1:0] mant_b;
 
-    reg [PROD_W-1:0] product;
+    (* use_dsp = "yes" *) reg [PROD_W-1:0] product;
+
+    localparam integer DSP_MANT_W = (MANT_W < 18) ? 18 : MANT_W;
+
+    wire [MANT_W-1:0] mant_a_mul;
+    wire [MANT_W-1:0] mant_b_mul;
+    wire [DSP_MANT_W-1:0] mant_a_dsp;
+    wire [DSP_MANT_W-1:0] mant_b_dsp;
+    (* use_dsp = "yes" *) wire [(2*DSP_MANT_W)-1:0] product_dsp;
+
+    assign mant_a_mul = {1'b1, fraction_a};
+    assign mant_b_mul = {1'b1, fraction_b};
+    assign mant_a_dsp = {{(DSP_MANT_W-MANT_W){1'b0}}, mant_a_mul};
+    assign mant_b_dsp = {{(DSP_MANT_W-MANT_W){1'b0}}, mant_b_mul};
+    assign product_dsp = mant_a_dsp * mant_b_dsp;
 
     reg signed [TE_BITS-1:0] scale_a;
     reg signed [TE_BITS-1:0] scale_b;
@@ -221,7 +230,7 @@ module posit_multiplier #(
             // product is Q2.2N style:
             // [2N+1 : 0]
             //--------------------------------------------------
-            product = mant_a * mant_b;
+            product = product_dsp[PROD_W-1:0];
 
             //--------------------------------------------------
             // Compute scale
