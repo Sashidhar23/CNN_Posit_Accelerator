@@ -6,8 +6,8 @@ module tb_systolic_core_quire;
     parameter ES = 1;
     parameter ROWS = 6;
     parameter COLS = 6;
-    parameter QW = 128;
-    parameter QF = 64;
+    parameter QW = 48;
+    parameter QF = QW / 2;
     parameter IN_COUNT_W = $clog2(ROWS + 1);
     parameter OUT_COUNT_W = $clog2(COLS + 1);
 
@@ -48,7 +48,7 @@ module tb_systolic_core_quire;
     localparam [7:0] POSIT_ZERO = 8'h00;
     localparam [7:0] POSIT_ONE  = 8'h40;
     localparam signed [QW-1:0] QUIRE_ZERO = {QW{1'b0}};
-    localparam signed [QW-1:0] QUIRE_ONE  = $signed(128'd1 <<< QF);
+    localparam signed [QW-1:0] QUIRE_ONE  = $signed({{(QW-1){1'b0}}, 1'b1} <<< QF);
 
     systolic_core_quire #(
         .N(N),
