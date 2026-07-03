@@ -5,7 +5,7 @@ module systolic_core_quire #(
     parameter ES = 1,
     parameter ROWS = 6,
     parameter COLS = 6,
-    parameter QW = 128,
+    parameter QW = 48,
     parameter QF = QW / 2,
     parameter IN_FIFO_DEPTH = 16,
     parameter IN_COUNT_W = $clog2(IN_FIFO_DEPTH + 1),
