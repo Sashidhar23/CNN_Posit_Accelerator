@@ -17,7 +17,7 @@
 module pe_quire #(
     parameter N  = 8,
     parameter ES = 1,
-    parameter QW = 128,
+    parameter QW = 48,
     parameter QF = QW / 2
 )(
     input  wire                 clk,
@@ -121,7 +121,7 @@ module pe_quire #(
 
     reg [N:0] mant_a;
     reg [N:0] mant_b;
-    reg [PROD_W-1:0] product_mag;
+    (* use_dsp = "yes" *) reg [PROD_W-1:0] product_mag;
     reg signed [SCALE_W-1:0] scale_a;
     reg signed [SCALE_W-1:0] scale_b;
     reg signed [SCALE_W-1:0] product_scale;
@@ -163,6 +163,10 @@ module pe_quire #(
         end
     end
 
+    (* use_dsp = "yes" *) wire signed [QW-1:0] psum_sum_comb;
+
+    assign psum_sum_comb = psum_pipe_reg + product_reg;
+
     always @(posedge clk) begin
         if (reset || clear_acc) begin
             product_reg   <= {QW{1'b0}};
@@ -175,7 +179,7 @@ module pe_quire #(
             product_reg   <= product_term;
             psum_pipe_reg <= psum_in;
             nar_pipe_reg  <= psum_nar_in | nar_a | nar_b;
-            psum_out_reg  <= psum_pipe_reg + product_reg;
+            psum_out_reg  <= psum_sum_comb;
             nar_out_reg   <= nar_pipe_reg;
         end
     end
