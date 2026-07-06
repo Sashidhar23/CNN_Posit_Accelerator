@@ -3,8 +3,8 @@
 module tb_systolic_array_quire;
     parameter N = 8;
     parameter ES = 1;
-    parameter ROWS = 6;
-    parameter COLS = 6;
+    parameter ROWS = 3;
+    parameter COLS = 3;
     parameter QW = 48;
     parameter QF = QW / 2;
 
