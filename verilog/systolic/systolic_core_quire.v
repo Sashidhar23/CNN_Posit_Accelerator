@@ -3,8 +3,8 @@
 module systolic_core_quire #(
     parameter N = 8,
     parameter ES = 1,
-    parameter ROWS = 6,
-    parameter COLS = 6,
+    parameter ROWS = 3,
+    parameter COLS = 3,
     parameter QW = 48,
     parameter QF = QW / 2,
     parameter IN_FIFO_DEPTH = 16,
@@ -49,8 +49,11 @@ module systolic_core_quire #(
     output wire [COLS*OUT_COUNT_W-1:0]  output_count
 );
 
-    reg [N-1:0] row_delay [0:ROWS-1][0:ROWS-1];
-    reg [N-1:0] output_delay [0:COLS-1][0:COLS-1];
+    localparam integer ROW_DELAY_DEPTH = (ROWS <= 1) ? 1 : ROWS-1;
+    localparam integer OUT_DELAY_DEPTH = (COLS <= 1) ? 1 : COLS-1;
+
+    reg [N-1:0] row_delay [0:ROWS-1][0:ROW_DELAY_DEPTH-1];
+    reg [N-1:0] output_delay [0:OUT_DELAY_DEPTH-1][0:OUT_DELAY_DEPTH-1];
     reg [ROWS-1:0] fifo_valid;
     wire [ROWS*N-1:0] fifo_activation_gated;
 
@@ -63,7 +66,7 @@ module systolic_core_quire #(
         if (reset) begin
             fifo_valid <= {ROWS{1'b0}};
             for (r = 0; r < ROWS; r = r + 1) begin
-                for (d = 0; d < ROWS; d = d + 1) begin
+                for (d = 0; d < ROW_DELAY_DEPTH; d = d + 1) begin
                     row_delay[r][d] <= {N{1'b0}};
                 end
             end
@@ -91,8 +94,8 @@ module systolic_core_quire #(
 
     always @(posedge clk) begin
         if (reset || output_clear) begin
-            for (oc = 0; oc < COLS; oc = oc + 1) begin
-                for (od = 0; od < COLS; od = od + 1) begin
+            for (oc = 0; oc < OUT_DELAY_DEPTH; oc = oc + 1) begin
+                for (od = 0; od < OUT_DELAY_DEPTH; od = od + 1) begin
                     output_delay[oc][od] <= {N{1'b0}};
                 end
             end
