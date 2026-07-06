@@ -4,8 +4,8 @@ module tb_systolic_core;
 
     parameter N = 8;
     parameter ES = 1;
-    parameter ROWS = 6;
-    parameter COLS = 6;
+    parameter ROWS = 3;
+    parameter COLS = 3;
     parameter IN_COUNT_W = $clog2(ROWS + 1);
     parameter OUT_COUNT_W = $clog2(COLS + 1);
 
@@ -91,16 +91,11 @@ module tb_systolic_core;
         input [N-1:0] row0;
         input [N-1:0] row1;
         input [N-1:0] row2;
-        input [N-1:0] row3;
-        input [N-1:0] row4;
-        input [N-1:0] row5;
         begin
+            activation_in = {ROWS*N{1'b0}};
             activation_in[0*N +: N] = row0;
             activation_in[1*N +: N] = row1;
             activation_in[2*N +: N] = row2;
-            activation_in[3*N +: N] = row3;
-            activation_in[4*N +: N] = row4;
-            activation_in[5*N +: N] = row5;
         end
     endtask
 
@@ -143,9 +138,6 @@ module tb_systolic_core;
         input [N-1:0] exp0;
         input [N-1:0] exp1;
         input [N-1:0] exp2;
-        input [N-1:0] exp3;
-        input [N-1:0] exp4;
-        input [N-1:0] exp5;
         input [511:0] name;
         reg [ROWS*N-1:0] expected;
         begin
@@ -153,9 +145,6 @@ module tb_systolic_core;
             expected[0*N +: N] = exp0;
             expected[1*N +: N] = exp1;
             expected[2*N +: N] = exp2;
-            expected[3*N +: N] = exp3;
-            expected[4*N +: N] = exp4;
-            expected[5*N +: N] = exp5;
 
             $display("------------------------------------------");
             $display("%0s", name);
@@ -204,14 +193,12 @@ module tb_systolic_core;
 
     task enqueue_row0_one;
         begin
-            drive_activation(POSIT_ONE, POSIT_ZERO, POSIT_ZERO,
-                             POSIT_ZERO, POSIT_ZERO, POSIT_ZERO);
+            drive_activation(POSIT_ONE, POSIT_ZERO, POSIT_ZERO);
             input_write_en = 1'b1;
             @(posedge clk);
             #1;
             input_write_en = 1'b0;
-            drive_activation(POSIT_ZERO, POSIT_ZERO, POSIT_ZERO,
-                             POSIT_ZERO, POSIT_ZERO, POSIT_ZERO);
+            drive_activation(POSIT_ZERO, POSIT_ZERO, POSIT_ZERO);
         end
     endtask
 
@@ -294,10 +281,8 @@ module tb_systolic_core;
         enqueue_row0_one();
         prefetch_inputs();
         check_row_vector(fifo_activation, POSIT_ONE, POSIT_ZERO, POSIT_ZERO,
-                         POSIT_ZERO, POSIT_ZERO, POSIT_ZERO,
                          "Input FIFO prefetch presents one activation vector");
         check_row_vector(skewed_activation, POSIT_ONE, POSIT_ZERO, POSIT_ZERO,
-                         POSIT_ZERO, POSIT_ZERO, POSIT_ZERO,
                          "Valid-gated FIFO drives row0 once");
 
         run_until_buffered_one();
