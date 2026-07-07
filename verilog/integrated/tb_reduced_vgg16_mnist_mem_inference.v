@@ -86,6 +86,10 @@ module tb_reduced_vgg16_mnist_mem_inference;
     integer correct_count;
     integer test_image;
     integer image_base;
+    integer predicted_class [0:NUM_TEST_IMAGES-1];
+    integer expected_class_int [0:NUM_TEST_IMAGES-1];
+    integer zero_logit_count;
+    reg [N-1:0] observed_logits [0:NUM_CLASSES-1];
     reg [CLASS_W-1:0] expected_class [0:NUM_TEST_IMAGES-1];
 
     reduced_vgg16_mnist #(
@@ -146,6 +150,7 @@ module tb_reduced_vgg16_mnist_mem_inference;
             @(posedge clk);
             @(posedge clk);
             #1;
+            observed_logits[addr] = logit_read_data;
             $display("LOGIT[%0d] = %h", addr, logit_read_data);
         end
     endtask
@@ -212,6 +217,7 @@ module tb_reduced_vgg16_mnist_mem_inference;
         correct_count = 0;
         test_image = 0;
         image_base = 0;
+        zero_logit_count = 0;
 
         expected_class[0] = 4'd7;
         expected_class[1] = 4'd2;
@@ -223,6 +229,14 @@ module tb_reduced_vgg16_mnist_mem_inference;
         expected_class[7] = 4'd9;
         expected_class[8] = 4'd5;
         expected_class[9] = 4'd9;
+
+        for (i = 0; i < NUM_TEST_IMAGES; i = i + 1) begin
+            predicted_class[i] = -1;
+            expected_class_int[i] = expected_class[i];
+        end
+
+        for (i = 0; i < NUM_CLASSES; i = i + 1)
+            observed_logits[i] = {N{1'b0}};
 
         read_all_memories();
 
@@ -278,6 +292,17 @@ module tb_reduced_vgg16_mnist_mem_inference;
             for (i = 0; i < NUM_CLASSES; i = i + 1)
                 show_logit(i);
 
+            zero_logit_count = 0;
+            for (i = 0; i < NUM_CLASSES; i = i + 1) begin
+                if (observed_logits[i] == {N{1'b0}})
+                    zero_logit_count = zero_logit_count + 1;
+            end
+            if (zero_logit_count == NUM_CLASSES)
+                $display("WARN image %0d all logits are zero; inference data path likely went inactive before classifier output",
+                         test_image);
+
+            predicted_class[test_image] = class_out;
+
             if (class_out !== expected_class[test_image]) begin
                 $display("FAIL image %0d class_out got=%0d expected=%0d",
                          test_image, class_out, expected_class[test_image]);
@@ -293,6 +318,10 @@ module tb_reduced_vgg16_mnist_mem_inference;
         end
 
         $display("------------------------------------------------------------");
+        $display("Image predictions summary:");
+        for (i = 0; i < NUM_TEST_IMAGES; i = i + 1)
+            $display("  image %0d predicted=%0d expected=%0d",
+                     i, predicted_class[i], expected_class_int[i]);
         $display("Accuracy = %0d / %0d", correct_count, NUM_TEST_IMAGES);
 
         if (errors == 0)
