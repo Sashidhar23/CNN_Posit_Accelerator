@@ -10,8 +10,8 @@ module conv2D_quire #(
     parameter K = 3,
     parameter PADDING = 1,
     parameter STRIDE = 1,
-    parameter ROWS = 6,
-    parameter COLS = 6,
+    parameter ROWS = 3,
+    parameter COLS = 3,
     parameter QW = 48,
     parameter QF = QW / 2,
     parameter OUT_H = ((IN_H + (2*PADDING) - K) / STRIDE) + 1,
@@ -103,6 +103,8 @@ module conv2D_quire #(
     reg core_activation_load_en;
     reg [ROW_ADDR_W-1:0] core_activation_row;
     reg [N-1:0] core_activation_data;
+    reg core_activation_vector_load_en;
+    reg [ROWS*N-1:0] core_activation_vector_data;
     reg core_weight_load_en;
     reg [WEIGHT_ADDR_W-1:0] core_weight_addr;
     reg [N-1:0] core_weight_data;
@@ -111,6 +113,8 @@ module conv2D_quire #(
 
     wire [N-1:0] core_output_data;
     wire core_output_is_nar;
+    wire [COLS*N-1:0] core_output_vector_data;
+    wire [COLS-1:0] core_output_vector_is_nar;
     wire [N-1:0] accum_selected_sum;
     wire [ROWS-1:0] input_full;
     wire [ROWS-1:0] input_empty;
@@ -176,6 +180,8 @@ module conv2D_quire #(
         .activation_load_en(core_activation_load_en),
         .activation_row(core_activation_row),
         .activation_data(core_activation_data),
+        .activation_vector_load_en(core_activation_vector_load_en),
+        .activation_vector_data(core_activation_vector_data),
         .weight_load_en(core_weight_load_en),
         .weight_addr(core_weight_addr),
         .weight_data(core_weight_data),
@@ -188,6 +194,8 @@ module conv2D_quire #(
         .output_col(core_output_col),
         .output_data(core_output_data),
         .output_is_nar(core_output_is_nar),
+        .output_vector_data(core_output_vector_data),
+        .output_vector_is_nar(core_output_vector_is_nar),
         .input_full(input_full),
         .input_empty(input_empty)
     );
@@ -217,6 +225,8 @@ module conv2D_quire #(
             core_activation_load_en <= 1'b0;
             core_activation_row <= {ROW_ADDR_W{1'b0}};
             core_activation_data <= {N{1'b0}};
+            core_activation_vector_load_en <= 1'b0;
+            core_activation_vector_data <= {ROWS*N{1'b0}};
             core_weight_load_en <= 1'b0;
             core_weight_addr <= {WEIGHT_ADDR_W{1'b0}};
             core_weight_data <= {N{1'b0}};
@@ -236,6 +246,8 @@ module conv2D_quire #(
             core_output_read_en <= 1'b0;
             core_activation_load_en <= 1'b0;
             core_activation_data <= {N{1'b0}};
+            core_activation_vector_load_en <= 1'b0;
+            core_activation_vector_data <= {ROWS*N{1'b0}};
             core_weight_load_en <= 1'b0;
             core_weight_data <= {N{1'b0}};
             done <= 1'b0;
@@ -404,5 +416,3 @@ module conv2D_quire #(
             endcase
         end
     end
-
-endmodule
