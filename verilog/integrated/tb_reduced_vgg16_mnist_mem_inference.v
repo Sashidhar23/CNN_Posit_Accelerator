@@ -20,9 +20,8 @@ module tb_reduced_vgg16_mnist_mem_inference;
     localparam [1:0] CFG_WEIGHT = 2'd1;
     localparam [1:0] CFG_BIAS   = 2'd2;
 
-    localparam integer TEST_IMAGE_INDEX = 0;
+    localparam integer NUM_TEST_IMAGES = 10;
     localparam integer IMAGE_SIZE = IN_CH * IN_H * IN_W;
-    localparam [CLASS_W-1:0] EXPECTED_CLASS = 4'd7;
     localparam integer MAX_INFERENCE_CYCLES = 500000000;
 
     localparam integer L0_W_SIZE  = C1 * IN_CH * 3 * 3;
@@ -84,9 +83,12 @@ module tb_reduced_vgg16_mnist_mem_inference;
     integer i;
     integer timeout;
     integer errors;
+    integer correct_count;
+    integer test_image;
     integer image_base;
+    reg [CLASS_W-1:0] expected_class [0:NUM_TEST_IMAGES-1];
 
-    reduced_vgg16_mnist_quire #(
+    reduced_vgg16_mnist #(
         .N(N),
         .ES(ES),
         .IN_CH(IN_CH),
@@ -183,7 +185,7 @@ module tb_reduced_vgg16_mnist_mem_inference;
     begin \
         for (i = 0; i < IMAGE_SIZE; i = i + 1) \
             cfg_write(4'd0, CFG_INPUT, i, pixels[(ARRAY_BASE) + i]); \
-        $display("Loaded image %0d into layer 0 input memory", TEST_IMAGE_INDEX); \
+        $display("Loaded image %0d into layer 0 input memory", test_image); \
     end
 
 `define LOAD_WB(LAYER_ID, W_ARRAY, W_COUNT, B_ARRAY, B_COUNT, NAME) \
@@ -207,7 +209,20 @@ module tb_reduced_vgg16_mnist_mem_inference;
         logit_read_addr = 0;
         timeout = 0;
         errors = 0;
-        image_base = TEST_IMAGE_INDEX * IMAGE_SIZE;
+        correct_count = 0;
+        test_image = 0;
+        image_base = 0;
+
+        expected_class[0] = 4'd7;
+        expected_class[1] = 4'd2;
+        expected_class[2] = 4'd1;
+        expected_class[3] = 4'd0;
+        expected_class[4] = 4'd4;
+        expected_class[5] = 4'd1;
+        expected_class[6] = 4'd4;
+        expected_class[7] = 4'd9;
+        expected_class[8] = 4'd5;
+        expected_class[9] = 4'd9;
 
         read_all_memories();
 
@@ -216,9 +231,6 @@ module tb_reduced_vgg16_mnist_mem_inference;
         repeat (2) @(posedge clk);
 
         $display("Starting full VGG16-MNIST posit<8,1> inference memory load");
-        $display("Image index %0d is expected to classify as digit %0d", TEST_IMAGE_INDEX, EXPECTED_CLASS);
-
-        `LOAD_INPUT(image_base)
         `LOAD_WB(4'd0,  l0_w,  L0_W_SIZE,  l0_b,  C1,          "features.0")
         `LOAD_WB(4'd1,  l1_w,  L1_W_SIZE,  l1_b,  C1,          "features.2")
         `LOAD_WB(4'd2,  l2_w,  L2_W_SIZE,  l2_b,  C2,          "features.5")
@@ -232,37 +244,56 @@ module tb_reduced_vgg16_mnist_mem_inference;
         `LOAD_WB(4'd10, l10_w, L10_W_SIZE, l10_b, FC1,         "classifier.0")
         `LOAD_WB(4'd11, l11_w, L11_W_SIZE, l11_b, NUM_CLASSES, "classifier.3")
 
-        $display("Memory load complete; starting inference");
-        @(posedge clk);
-        start = 1'b1;
-        @(posedge clk);
-        start = 1'b0;
+        $display("Weight and bias load complete; starting 10-image inference run");
 
-        while (!done && timeout < MAX_INFERENCE_CYCLES) begin
+        for (test_image = 0; test_image < NUM_TEST_IMAGES; test_image = test_image + 1) begin
+            image_base = test_image * IMAGE_SIZE;
+            timeout = 0;
+
+            $display("------------------------------------------------------------");
+            $display("Image %0d expected digit %0d", test_image, expected_class[test_image]);
+            `LOAD_INPUT(image_base)
+
             @(posedge clk);
-            timeout = timeout + 1;
-            if ((timeout % 1000000) == 0)
-                $display("Inference still running at cycle %0d", timeout);
+            start = 1'b1;
+            @(posedge clk);
+            start = 1'b0;
+
+            while (!done && timeout < MAX_INFERENCE_CYCLES) begin
+                @(posedge clk);
+                timeout = timeout + 1;
+                if ((timeout % 1000000) == 0)
+                    $display("Image %0d inference still running at cycle %0d", test_image, timeout);
+            end
+
+            if (!done) begin
+                $display("FAIL image %0d timeout waiting for reduced_vgg16_mnist done after %0d cycles",
+                         test_image, timeout);
+                errors = errors + 1;
+            end
+            else begin
+                $display("PASS image %0d inference done after %0d cycles", test_image, timeout);
+            end
+
+            for (i = 0; i < NUM_CLASSES; i = i + 1)
+                show_logit(i);
+
+            if (class_out !== expected_class[test_image]) begin
+                $display("FAIL image %0d class_out got=%0d expected=%0d",
+                         test_image, class_out, expected_class[test_image]);
+                errors = errors + 1;
+            end
+            else begin
+                correct_count = correct_count + 1;
+                $display("PASS image %0d class_out=%0d expected=%0d",
+                         test_image, class_out, expected_class[test_image]);
+            end
+
+            repeat (4) @(posedge clk);
         end
 
-        if (!done) begin
-            $display("FAIL timeout waiting for reduced_vgg16_mnist done after %0d cycles", timeout);
-            errors = errors + 1;
-        end
-        else begin
-            $display("PASS inference done after %0d cycles", timeout);
-        end
-
-        for (i = 0; i < NUM_CLASSES; i = i + 1)
-            show_logit(i);
-
-        if (class_out !== EXPECTED_CLASS) begin
-            $display("FAIL class_out got=%0d expected=%0d", class_out, EXPECTED_CLASS);
-            errors = errors + 1;
-        end
-        else begin
-            $display("PASS class_out=%0d expected=%0d", class_out, EXPECTED_CLASS);
-        end
+        $display("------------------------------------------------------------");
+        $display("Accuracy = %0d / %0d", correct_count, NUM_TEST_IMAGES);
 
         if (errors == 0)
             $display("tb_reduced_vgg16_mnist_mem_inference PASS");
