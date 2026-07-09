@@ -19,9 +19,12 @@ module tb_reduced_vgg16_mnist_mem_inference;
     localparam [1:0] CFG_INPUT  = 2'd0;
     localparam [1:0] CFG_WEIGHT = 2'd1;
     localparam [1:0] CFG_BIAS   = 2'd2;
+    localparam [1:0] PARAM_WEIGHT = 2'd0;
+    localparam [1:0] PARAM_BIAS   = 2'd1;
 
     localparam integer NUM_TEST_IMAGES = 10;
     localparam integer IMAGE_SIZE = IN_CH * IN_H * IN_W;
+    localparam integer MAX_FEATURE_VALUES = C1 * IN_H * IN_W;
     localparam integer MAX_INFERENCE_CYCLES = 500000000;
     localparam integer FAST_BACKDOOR_LOAD = 1;
 
@@ -78,8 +81,25 @@ module tb_reduced_vgg16_mnist_mem_inference;
     wire busy;
     wire done;
     wire [CLASS_W-1:0] class_out;
+    wire param_req_valid;
+    wire [1:0] param_req_kind;
+    wire [3:0] param_req_layer;
+    wire [31:0] param_req_addr;
+    reg param_resp_valid;
+    reg [N-1:0] param_resp_data;
+    wire feature_rd_req_valid;
+    wire feature_rd_bank;
+    wire [31:0] feature_rd_addr;
+    reg feature_rd_resp_valid;
+    reg [N-1:0] feature_rd_resp_data;
+    wire feature_wr_valid;
+    wire feature_wr_bank;
+    wire [31:0] feature_wr_addr;
+    wire [N-1:0] feature_wr_data;
 
     reg [N-1:0] pixels [0:(10*IMAGE_SIZE)-1];
+    reg [N-1:0] feature_bank0 [0:MAX_FEATURE_VALUES-1];
+    reg [N-1:0] feature_bank1 [0:MAX_FEATURE_VALUES-1];
 
     reg [N-1:0] l0_w  [0:L0_W_SIZE-1];
     reg [N-1:0] l1_w  [0:L1_W_SIZE-1];
@@ -144,6 +164,21 @@ module tb_reduced_vgg16_mnist_mem_inference;
         .cfg_mem(cfg_mem),
         .cfg_addr(cfg_addr),
         .cfg_data(cfg_data),
+        .param_req_valid(param_req_valid),
+        .param_req_kind(param_req_kind),
+        .param_req_layer(param_req_layer),
+        .param_req_addr(param_req_addr),
+        .param_resp_valid(param_resp_valid),
+        .param_resp_data(param_resp_data),
+        .feature_rd_req_valid(feature_rd_req_valid),
+        .feature_rd_bank(feature_rd_bank),
+        .feature_rd_addr(feature_rd_addr),
+        .feature_rd_resp_valid(feature_rd_resp_valid),
+        .feature_rd_resp_data(feature_rd_resp_data),
+        .feature_wr_valid(feature_wr_valid),
+        .feature_wr_bank(feature_wr_bank),
+        .feature_wr_addr(feature_wr_addr),
+        .feature_wr_data(feature_wr_data),
         .logit_read_addr(logit_read_addr),
         .logit_read_data(logit_read_data),
         .busy(busy),
@@ -152,6 +187,86 @@ module tb_reduced_vgg16_mnist_mem_inference;
     );
 
     always #5 clk = ~clk;
+
+    function [N-1:0] weight_lookup;
+        input [3:0] layer_id;
+        input [31:0] addr;
+        begin
+            case (layer_id)
+                4'd0:  weight_lookup = (addr < L0_W_SIZE)  ? l0_w[addr]  : {N{1'b0}};
+                4'd1:  weight_lookup = (addr < L1_W_SIZE)  ? l1_w[addr]  : {N{1'b0}};
+                4'd2:  weight_lookup = (addr < L2_W_SIZE)  ? l2_w[addr]  : {N{1'b0}};
+                4'd3:  weight_lookup = (addr < L3_W_SIZE)  ? l3_w[addr]  : {N{1'b0}};
+                4'd4:  weight_lookup = (addr < L4_W_SIZE)  ? l4_w[addr]  : {N{1'b0}};
+                4'd5:  weight_lookup = (addr < L5_W_SIZE)  ? l5_w[addr]  : {N{1'b0}};
+                4'd6:  weight_lookup = (addr < L6_W_SIZE)  ? l6_w[addr]  : {N{1'b0}};
+                4'd7:  weight_lookup = (addr < L7_W_SIZE)  ? l7_w[addr]  : {N{1'b0}};
+                4'd8:  weight_lookup = (addr < L8_W_SIZE)  ? l8_w[addr]  : {N{1'b0}};
+                4'd9:  weight_lookup = (addr < L9_W_SIZE)  ? l9_w[addr]  : {N{1'b0}};
+                4'd10: weight_lookup = (addr < L10_W_SIZE) ? l10_w[addr] : {N{1'b0}};
+                4'd11: weight_lookup = (addr < L11_W_SIZE) ? l11_w[addr] : {N{1'b0}};
+                default: weight_lookup = {N{1'b0}};
+            endcase
+        end
+    endfunction
+
+    function [N-1:0] bias_lookup;
+        input [3:0] layer_id;
+        input [31:0] addr;
+        begin
+            case (layer_id)
+                4'd0:  bias_lookup = (addr < C1)          ? l0_b[addr]  : {N{1'b0}};
+                4'd1:  bias_lookup = (addr < C1)          ? l1_b[addr]  : {N{1'b0}};
+                4'd2:  bias_lookup = (addr < C2)          ? l2_b[addr]  : {N{1'b0}};
+                4'd3:  bias_lookup = (addr < C2)          ? l3_b[addr]  : {N{1'b0}};
+                4'd4:  bias_lookup = (addr < C3)          ? l4_b[addr]  : {N{1'b0}};
+                4'd5:  bias_lookup = (addr < C3)          ? l5_b[addr]  : {N{1'b0}};
+                4'd6:  bias_lookup = (addr < C3)          ? l6_b[addr]  : {N{1'b0}};
+                4'd7:  bias_lookup = (addr < C4)          ? l7_b[addr]  : {N{1'b0}};
+                4'd8:  bias_lookup = (addr < C4)          ? l8_b[addr]  : {N{1'b0}};
+                4'd9:  bias_lookup = (addr < C4)          ? l9_b[addr]  : {N{1'b0}};
+                4'd10: bias_lookup = (addr < FC1)         ? l10_b[addr] : {N{1'b0}};
+                4'd11: bias_lookup = (addr < NUM_CLASSES) ? l11_b[addr] : {N{1'b0}};
+                default: bias_lookup = {N{1'b0}};
+            endcase
+        end
+    endfunction
+
+    always @(posedge clk) begin
+        if (reset) begin
+            param_resp_valid <= 1'b0;
+            param_resp_data <= {N{1'b0}};
+            feature_rd_resp_valid <= 1'b0;
+            feature_rd_resp_data <= {N{1'b0}};
+        end
+        else begin
+            param_resp_valid <= param_req_valid;
+            if (param_req_valid && param_req_kind == PARAM_WEIGHT)
+                param_resp_data <= weight_lookup(param_req_layer, param_req_addr);
+            else if (param_req_valid && param_req_kind == PARAM_BIAS)
+                param_resp_data <= bias_lookup(param_req_layer, param_req_addr);
+            else
+                param_resp_data <= {N{1'b0}};
+
+            feature_rd_resp_valid <= feature_rd_req_valid;
+            if (feature_rd_req_valid && feature_rd_addr < MAX_FEATURE_VALUES) begin
+                if (feature_rd_bank)
+                    feature_rd_resp_data <= feature_bank1[feature_rd_addr];
+                else
+                    feature_rd_resp_data <= feature_bank0[feature_rd_addr];
+            end
+            else begin
+                feature_rd_resp_data <= {N{1'b0}};
+            end
+
+            if (feature_wr_valid && feature_wr_addr < MAX_FEATURE_VALUES) begin
+                if (feature_wr_bank)
+                    feature_bank1[feature_wr_addr] <= feature_wr_data;
+                else
+                    feature_bank0[feature_wr_addr] <= feature_wr_data;
+            end
+        end
+    end
 
     task cfg_write;
         input [3:0] layer_id;
@@ -185,83 +300,51 @@ module tb_reduced_vgg16_mnist_mem_inference;
 
     task read_all_memories;
         begin
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/mnist_pixels_posit8_1.mem", pixels);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/mnist_pixels_posit8_1.mem", pixels);
 
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_0_weight_posit8_1.mem", l0_w);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_0_bias_posit8_1.mem", l0_b);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_2_weight_posit8_1.mem", l1_w);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_2_bias_posit8_1.mem", l1_b);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_5_weight_posit8_1.mem", l2_w);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_5_bias_posit8_1.mem", l2_b);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_7_weight_posit8_1.mem", l3_w);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_7_bias_posit8_1.mem", l3_b);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_10_weight_posit8_1.mem", l4_w);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_10_bias_posit8_1.mem", l4_b);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_12_weight_posit8_1.mem", l5_w);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_12_bias_posit8_1.mem", l5_b);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_14_weight_posit8_1.mem", l6_w);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_14_bias_posit8_1.mem", l6_b);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_17_weight_posit8_1.mem", l7_w);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_17_bias_posit8_1.mem", l7_b);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_19_weight_posit8_1.mem", l8_w);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_19_bias_posit8_1.mem", l8_b);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_21_weight_posit8_1.mem", l9_w);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_21_bias_posit8_1.mem", l9_b);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/classifier_0_weight_posit8_1.mem", l10_w);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/classifier_0_bias_posit8_1.mem", l10_b);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/classifier_3_weight_posit8_1.mem", l11_w);
-            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/classifier_3_bias_posit8_1.mem", l11_b);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_0_weight_posit8_1.mem", l0_w);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_0_bias_posit8_1.mem", l0_b);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_2_weight_posit8_1.mem", l1_w);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_2_bias_posit8_1.mem", l1_b);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_5_weight_posit8_1.mem", l2_w);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_5_bias_posit8_1.mem", l2_b);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_7_weight_posit8_1.mem", l3_w);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_7_bias_posit8_1.mem", l3_b);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_10_weight_posit8_1.mem", l4_w);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_10_bias_posit8_1.mem", l4_b);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_12_weight_posit8_1.mem", l5_w);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_12_bias_posit8_1.mem", l5_b);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_14_weight_posit8_1.mem", l6_w);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_14_bias_posit8_1.mem", l6_b);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_17_weight_posit8_1.mem", l7_w);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_17_bias_posit8_1.mem", l7_b);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_19_weight_posit8_1.mem", l8_w);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_19_bias_posit8_1.mem", l8_b);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_21_weight_posit8_1.mem", l9_w);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_21_bias_posit8_1.mem", l9_b);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/classifier_0_weight_posit8_1.mem", l10_w);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/classifier_0_bias_posit8_1.mem", l10_b);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/classifier_3_weight_posit8_1.mem", l11_w);
+            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/classifier_3_bias_posit8_1.mem", l11_b);
         end
     endtask
 
     task preload_image_fast;
         input integer array_base;
         begin
+            for (i = 0; i < MAX_FEATURE_VALUES; i = i + 1) begin
+                feature_bank0[i] = {N{1'b0}};
+                feature_bank1[i] = {N{1'b0}};
+            end
             for (i = 0; i < IMAGE_SIZE; i = i + 1)
-                DUT.CORE.feature_a[i] = pixels[array_base + i];
-            $display("Fast-loaded image %0d into shared feature_a input buffer", test_image);
+                feature_bank0[i] = pixels[array_base + i];
+            $display("Fast-loaded image %0d into external feature bank 0", test_image);
         end
     endtask
 
     task preload_weights_fast;
         begin
-            for (i = 0; i < L0_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L0_W_BASE + i] = l0_w[i];
-            for (i = 0; i < C1; i = i + 1) DUT.CORE.bias_mem[L0_B_BASE + i] = l0_b[i];
-
-            for (i = 0; i < L1_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L1_W_BASE + i] = l1_w[i];
-            for (i = 0; i < C1; i = i + 1) DUT.CORE.bias_mem[L1_B_BASE + i] = l1_b[i];
-
-            for (i = 0; i < L2_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L2_W_BASE + i] = l2_w[i];
-            for (i = 0; i < C2; i = i + 1) DUT.CORE.bias_mem[L2_B_BASE + i] = l2_b[i];
-
-            for (i = 0; i < L3_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L3_W_BASE + i] = l3_w[i];
-            for (i = 0; i < C2; i = i + 1) DUT.CORE.bias_mem[L3_B_BASE + i] = l3_b[i];
-
-            for (i = 0; i < L4_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L4_W_BASE + i] = l4_w[i];
-            for (i = 0; i < C3; i = i + 1) DUT.CORE.bias_mem[L4_B_BASE + i] = l4_b[i];
-
-            for (i = 0; i < L5_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L5_W_BASE + i] = l5_w[i];
-            for (i = 0; i < C3; i = i + 1) DUT.CORE.bias_mem[L5_B_BASE + i] = l5_b[i];
-
-            for (i = 0; i < L6_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L6_W_BASE + i] = l6_w[i];
-            for (i = 0; i < C3; i = i + 1) DUT.CORE.bias_mem[L6_B_BASE + i] = l6_b[i];
-
-            for (i = 0; i < L7_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L7_W_BASE + i] = l7_w[i];
-            for (i = 0; i < C4; i = i + 1) DUT.CORE.bias_mem[L7_B_BASE + i] = l7_b[i];
-
-            for (i = 0; i < L8_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L8_W_BASE + i] = l8_w[i];
-            for (i = 0; i < C4; i = i + 1) DUT.CORE.bias_mem[L8_B_BASE + i] = l8_b[i];
-
-            for (i = 0; i < L9_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L9_W_BASE + i] = l9_w[i];
-            for (i = 0; i < C4; i = i + 1) DUT.CORE.bias_mem[L9_B_BASE + i] = l9_b[i];
-
-            for (i = 0; i < L10_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L10_W_BASE + i] = l10_w[i];
-            for (i = 0; i < FC1; i = i + 1) DUT.CORE.bias_mem[L10_B_BASE + i] = l10_b[i];
-
-            for (i = 0; i < L11_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L11_W_BASE + i] = l11_w[i];
-            for (i = 0; i < NUM_CLASSES; i = i + 1) DUT.CORE.bias_mem[L11_B_BASE + i] = l11_b[i];
-
-            $display("Fast-loaded all weights and biases into shared memories by simulation backdoor");
+            $display("Weights and biases remain in the external parameter memory model");
         end
     endtask
 
@@ -274,11 +357,7 @@ module tb_reduced_vgg16_mnist_mem_inference;
 
 `define LOAD_WB(LAYER_ID, W_ARRAY, W_COUNT, B_ARRAY, B_COUNT, NAME) \
     begin \
-        for (i = 0; i < W_COUNT; i = i + 1) \
-            cfg_write(LAYER_ID, CFG_WEIGHT, i, W_ARRAY[i]); \
-        for (i = 0; i < B_COUNT; i = i + 1) \
-            cfg_write(LAYER_ID, CFG_BIAS, i, B_ARRAY[i]); \
-        $display("Loaded %0s weights=%0d biases=%0d", NAME, W_COUNT, B_COUNT); \
+        $display("External parameter model ready for %0s weights=%0d biases=%0d", NAME, W_COUNT, B_COUNT); \
     end
 
     initial begin
@@ -291,6 +370,10 @@ module tb_reduced_vgg16_mnist_mem_inference;
         cfg_addr = 0;
         cfg_data = 0;
         logit_read_addr = 0;
+        param_resp_valid = 1'b0;
+        param_resp_data = {N{1'b0}};
+        feature_rd_resp_valid = 1'b0;
+        feature_rd_resp_data = {N{1'b0}};
         timeout = 0;
         errors = 0;
         correct_count = 0;
@@ -299,16 +382,7 @@ module tb_reduced_vgg16_mnist_mem_inference;
         image_base = 0;
         zero_logit_count = 0;
 
-        expected_class[0] = 4'd7;
-        expected_class[1] = 4'd2;
-        expected_class[2] = 4'd1;
-        expected_class[3] = 4'd0;
-        expected_class[4] = 4'd4;
-        expected_class[5] = 4'd1;
-        expected_class[6] = 4'd4;
-        expected_class[7] = 4'd9;
-        expected_class[8] = 4'd5;
-        expected_class[9] = 4'd9;
+`include "tb/cnn/mnist_expected_labels.vh"
 
         for (i = 0; i < NUM_TEST_IMAGES; i = i + 1) begin
             predicted_class[i] = -1;
