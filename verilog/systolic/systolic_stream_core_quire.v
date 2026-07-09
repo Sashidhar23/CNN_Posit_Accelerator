@@ -31,24 +31,20 @@ module systolic_stream_core_quire #(
 
     output reg                          result_valid,
     output reg  [TAG_W-1:0]             result_tag,
-    output reg  [COLS*QW-1:0]           result_quire_data,
     output reg  [COLS*N-1:0]            result_data,
     output reg  [COLS-1:0]              result_is_nar
 );
 
     reg [ROWS*COLS*N-1:0] weight_regs;
     reg [N-1:0] row_delay [0:ROWS-1][0:MAX_ROW_DELAY-1];
-    reg signed [QW-1:0] output_quire_delay [0:COLS-1][0:OUT_DELAY_DEPTH-1];
     reg [N-1:0] output_delay [0:COLS-1][0:OUT_DELAY_DEPTH-1];
     reg output_nar_delay [0:COLS-1][0:OUT_DELAY_DEPTH-1];
     reg [RESULT_LATENCY-1:0] valid_pipe;
     reg [TAG_W-1:0] tag_pipe [0:RESULT_LATENCY-1];
 
     wire [ROWS*N-1:0] array_activation;
-    wire [COLS*QW-1:0] column_quire_out;
     wire [COLS*N-1:0] column_psum_out;
     wire [COLS-1:0] column_nar_out;
-    wire [COLS*QW-1:0] aligned_quire_output;
     wire [COLS*N-1:0] aligned_output;
     wire [COLS-1:0] aligned_nar;
 
@@ -73,13 +69,10 @@ module systolic_stream_core_quire #(
 
         for (gc = 0; gc < COLS; gc = gc + 1) begin : OUT_ALIGN_GEN
             if (gc == COLS-1) begin : LAST_COL
-                assign aligned_quire_output[gc*QW +: QW] = column_quire_out[gc*QW +: QW];
                 assign aligned_output[gc*N +: N] = column_psum_out[gc*N +: N];
                 assign aligned_nar[gc] = column_nar_out[gc];
             end
             else begin : DELAYED_COL
-                assign aligned_quire_output[gc*QW +: QW] =
-                    output_quire_delay[gc][COLS-gc-2];
                 assign aligned_output[gc*N +: N] =
                     output_delay[gc][COLS-gc-2];
                 assign aligned_nar[gc] =
@@ -106,7 +99,6 @@ module systolic_stream_core_quire #(
 
             for (c = 0; c < COLS; c = c + 1) begin
                 for (d = 0; d < OUT_DELAY_DEPTH; d = d + 1) begin
-                    output_quire_delay[c][d] <= {QW{1'b0}};
                     output_delay[c][d] <= {N{1'b0}};
                     output_nar_delay[c][d] <= 1'b0;
                 end
@@ -118,7 +110,6 @@ module systolic_stream_core_quire #(
 
             result_valid <= 1'b0;
             result_tag <= {TAG_W{1'b0}};
-            result_quire_data <= {COLS*QW{1'b0}};
             result_data <= {COLS*N{1'b0}};
             result_is_nar <= {COLS{1'b0}};
         end
@@ -130,11 +121,9 @@ module systolic_stream_core_quire #(
             end
 
             for (c = 0; c < COLS-1; c = c + 1) begin
-                output_quire_delay[c][0] <= column_quire_out[c*QW +: QW];
                 output_delay[c][0] <= column_psum_out[c*N +: N];
                 output_nar_delay[c][0] <= column_nar_out[c];
                 for (d = 1; d < COLS-c-1; d = d + 1) begin
-                    output_quire_delay[c][d] <= output_quire_delay[c][d-1];
                     output_delay[c][d] <= output_delay[c][d-1];
                     output_nar_delay[c][d] <= output_nar_delay[c][d-1];
                 end
@@ -149,7 +138,6 @@ module systolic_stream_core_quire #(
 
             result_valid <= valid_pipe[RESULT_LATENCY-1];
             result_tag <= tag_pipe[RESULT_LATENCY-1];
-            result_quire_data <= aligned_quire_output;
             result_data <= aligned_output;
             result_is_nar <= aligned_nar;
         end
@@ -177,10 +165,11 @@ module systolic_stream_core_quire #(
         .weight_out     (),
         .quire_out      (),
         .is_nar         (),
-        .psum_quire_out (column_quire_out),
+        .psum_quire_out (),
         .psum_nar_out   (column_nar_out),
         .psum_out       (column_psum_out),
         .pe_output      ()
     );
 
 endmodule
+
