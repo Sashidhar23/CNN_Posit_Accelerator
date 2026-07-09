@@ -185,32 +185,32 @@ module tb_reduced_vgg16_mnist_mem_inference;
 
     task read_all_memories;
         begin
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/mnist_pixels_posit8_1.mem", pixels);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/mnist_pixels_posit8_1.mem", pixels);
 
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_0_weight_posit8_1.mem", l0_w);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_0_bias_posit8_1.mem", l0_b);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_2_weight_posit8_1.mem", l1_w);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_2_bias_posit8_1.mem", l1_b);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_5_weight_posit8_1.mem", l2_w);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_5_bias_posit8_1.mem", l2_b);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_7_weight_posit8_1.mem", l3_w);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_7_bias_posit8_1.mem", l3_b);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_10_weight_posit8_1.mem", l4_w);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_10_bias_posit8_1.mem", l4_b);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_12_weight_posit8_1.mem", l5_w);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_12_bias_posit8_1.mem", l5_b);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_14_weight_posit8_1.mem", l6_w);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_14_bias_posit8_1.mem", l6_b);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_17_weight_posit8_1.mem", l7_w);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_17_bias_posit8_1.mem", l7_b);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_19_weight_posit8_1.mem", l8_w);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_19_bias_posit8_1.mem", l8_b);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_21_weight_posit8_1.mem", l9_w);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/features_21_bias_posit8_1.mem", l9_b);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/classifier_0_weight_posit8_1.mem", l10_w);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/classifier_0_bias_posit8_1.mem", l10_b);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/classifier_3_weight_posit8_1.mem", l11_w);
-            $readmemh("C:/Users/Oishik Ganguli/FPGA_projects/posit_cnn_accelerator/VGG16_MNIST_Epoch20/classifier_3_bias_posit8_1.mem", l11_b);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_0_weight_posit8_1.mem", l0_w);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_0_bias_posit8_1.mem", l0_b);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_2_weight_posit8_1.mem", l1_w);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_2_bias_posit8_1.mem", l1_b);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_5_weight_posit8_1.mem", l2_w);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_5_bias_posit8_1.mem", l2_b);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_7_weight_posit8_1.mem", l3_w);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_7_bias_posit8_1.mem", l3_b);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_10_weight_posit8_1.mem", l4_w);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_10_bias_posit8_1.mem", l4_b);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_12_weight_posit8_1.mem", l5_w);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_12_bias_posit8_1.mem", l5_b);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_14_weight_posit8_1.mem", l6_w);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_14_bias_posit8_1.mem", l6_b);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_17_weight_posit8_1.mem", l7_w);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_17_bias_posit8_1.mem", l7_b);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_19_weight_posit8_1.mem", l8_w);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_19_bias_posit8_1.mem", l8_b);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_21_weight_posit8_1.mem", l9_w);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/features_21_bias_posit8_1.mem", l9_b);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/classifier_0_weight_posit8_1.mem", l10_w);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/classifier_0_bias_posit8_1.mem", l10_b);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/classifier_3_weight_posit8_1.mem", l11_w);
+            $readmemh("C:/Users/Sashidhar Naidu/OneDrive/Desktop/CNN_Posit_Accelerator/verilog/params/classifier_3_bias_posit8_1.mem", l11_b);
         end
     endtask
 
