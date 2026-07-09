@@ -38,6 +38,24 @@ module reduced_vgg16_mnist_quire #(
     input  wire [31:0] cfg_addr,
     input  wire [N-1:0] cfg_data,
 
+    output wire        param_req_valid,
+    output wire [1:0]  param_req_kind,
+    output wire [3:0]  param_req_layer,
+    output wire [31:0] param_req_addr,
+    input  wire        param_resp_valid,
+    input  wire [N-1:0] param_resp_data,
+
+    output wire        feature_rd_req_valid,
+    output wire        feature_rd_bank,
+    output wire [31:0] feature_rd_addr,
+    input  wire        feature_rd_resp_valid,
+    input  wire [N-1:0] feature_rd_resp_data,
+
+    output wire        feature_wr_valid,
+    output wire        feature_wr_bank,
+    output wire [31:0] feature_wr_addr,
+    output wire [N-1:0] feature_wr_data,
+
     input  wire [31:0] logit_read_addr,
     output wire [N-1:0] logit_read_data,
 
@@ -46,10 +64,9 @@ module reduced_vgg16_mnist_quire #(
     output wire [CLASS_W-1:0] class_out
 );
 
-    reduced_vgg16_mnist_tm #(
+    reduced_vgg16_mnist_quire_tiled #(
         .N(N),
         .ES(ES),
-        .USE_QUIRE(1),
         .QW(QW),
         .QF(QF),
         .IN_CH(IN_CH),
@@ -83,6 +100,21 @@ module reduced_vgg16_mnist_quire #(
         .cfg_mem(cfg_mem),
         .cfg_addr(cfg_addr),
         .cfg_data(cfg_data),
+        .param_req_valid(param_req_valid),
+        .param_req_kind(param_req_kind),
+        .param_req_layer(param_req_layer),
+        .param_req_addr(param_req_addr),
+        .param_resp_valid(param_resp_valid),
+        .param_resp_data(param_resp_data),
+        .feature_rd_req_valid(feature_rd_req_valid),
+        .feature_rd_bank(feature_rd_bank),
+        .feature_rd_addr(feature_rd_addr),
+        .feature_rd_resp_valid(feature_rd_resp_valid),
+        .feature_rd_resp_data(feature_rd_resp_data),
+        .feature_wr_valid(feature_wr_valid),
+        .feature_wr_bank(feature_wr_bank),
+        .feature_wr_addr(feature_wr_addr),
+        .feature_wr_data(feature_wr_data),
         .logit_read_addr(logit_read_addr),
         .logit_read_data(logit_read_data),
         .busy(busy),
@@ -91,4 +123,3 @@ module reduced_vgg16_mnist_quire #(
     );
 
 endmodule
-
