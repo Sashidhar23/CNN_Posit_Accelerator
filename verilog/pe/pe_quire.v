@@ -54,7 +54,7 @@ module pe_quire #(
     reg signed [QW-1:0] product_reg;
     reg signed [QW-1:0] psum_pipe_reg;
     reg                 nar_pipe_reg;
-    (* use_dsp = "yes" *) reg signed [QW-1:0] psum_out_reg;
+    reg signed [QW-1:0] psum_out_reg;
     reg                 nar_out_reg;
 
     //--------------------------------------------------
@@ -88,7 +88,6 @@ module pe_quire #(
     //--------------------------------------------------
     localparam integer SCALE_W = $clog2(N) + ES + 4;
     localparam integer PROD_W  = 2*N + 2;
-    localparam integer DSP_MANT_W = ((N+1) < 18) ? 18 : (N+1);
 
     wire sign_a, sign_b;
     wire zero_a, zero_b;
@@ -120,12 +119,9 @@ module pe_quire #(
         .frac_len (flen_b)
     );
 
-    wire [N:0] mant_a;
-    wire [N:0] mant_b;
-    reg [PROD_W-1:0] product_mag;
-    wire [DSP_MANT_W-1:0] mant_a_dsp;
-    wire [DSP_MANT_W-1:0] mant_b_dsp;
-    (* use_dsp = "yes" *) wire [(2*DSP_MANT_W)-1:0] product_mag_dsp;
+    reg [N:0] mant_a;
+    reg [N:0] mant_b;
+    (* use_dsp = "yes" *) reg [PROD_W-1:0] product_mag;
     reg signed [SCALE_W-1:0] scale_a;
     reg signed [SCALE_W-1:0] scale_b;
     reg signed [SCALE_W-1:0] product_scale;
@@ -133,14 +129,10 @@ module pe_quire #(
     reg [QW-1:0] aligned_product;
     reg signed [QW-1:0] product_term;
 
-    assign mant_a = {1'b1, frac_a};
-    assign mant_b = {1'b1, frac_b};
-    assign mant_a_dsp = {{(DSP_MANT_W-(N+1)){1'b0}}, mant_a};
-    assign mant_b_dsp = {{(DSP_MANT_W-(N+1)){1'b0}}, mant_b};
-    assign product_mag_dsp = mant_a_dsp * mant_b_dsp;
-
     always @(*) begin
-        product_mag = product_mag_dsp[PROD_W-1:0];
+        mant_a = {1'b1, frac_a};
+        mant_b = {1'b1, frac_b};
+        product_mag = mant_a * mant_b;
 
         scale_a = (k_a <<< ES) + $signed({1'b0, exp_a});
         scale_b = (k_b <<< ES) + $signed({1'b0, exp_b});
@@ -171,6 +163,10 @@ module pe_quire #(
         end
     end
 
+    (* use_dsp = "yes" *) wire signed [QW-1:0] psum_sum_comb;
+
+    assign psum_sum_comb = psum_pipe_reg + product_reg;
+
     always @(posedge clk) begin
         if (reset || clear_acc) begin
             product_reg   <= {QW{1'b0}};
@@ -183,7 +179,7 @@ module pe_quire #(
             product_reg   <= product_term;
             psum_pipe_reg <= psum_in;
             nar_pipe_reg  <= psum_nar_in | nar_a | nar_b;
-            psum_out_reg  <= psum_pipe_reg + product_reg;
+            psum_out_reg  <= psum_sum_comb;
             nar_out_reg   <= nar_pipe_reg;
         end
     end
@@ -191,16 +187,105 @@ module pe_quire #(
     //--------------------------------------------------
     // Quire-to-posit conversion for observable PE output
     //--------------------------------------------------
-    quire_to_posit #(
-        .N(N),
-        .ES(ES),
-        .QW(QW),
-        .QF(QF)
-    ) QOUT_TO_POSIT (
-        .quire_in  (psum_out_reg),
-        .is_nar    (nar_out_reg),
+    reg enc_sign;
+    reg enc_zero;
+    reg enc_nar;
+    reg signed [$clog2(N):0] enc_k;
+    reg [ES-1:0] enc_exp;
+    reg [N-1:0] enc_frac;
+    reg [$clog2(N):0] enc_flen;
+
+    posit_encoder #(.N(N), .ES(ES)) ENC (
+        .sign      (enc_sign),
+        .is_zero   (enc_zero),
+        .is_nar    (enc_nar),
+        .k         (enc_k),
+        .exponent  (enc_exp),
+        .fraction  (enc_frac),
+        .frac_len  (enc_flen),
         .posit_out (pe_output)
     );
+
+    reg [QW-1:0] abs_quire;
+    reg [QW-1:0] norm_quire;
+    reg signed [SCALE_W-1:0] result_scale;
+    integer lead_pos;
+    integer norm_shift;
+    integer k_int;
+    integer e_int;
+    integer i;
+
+    function integer highest_one_pos;
+        input [QW-1:0] value;
+        integer j;
+        begin
+            highest_one_pos = -1;
+            for (j = 0; j < QW; j = j + 1) begin
+                if (value[j])
+                    highest_one_pos = j;
+            end
+        end
+    endfunction
+
+    always @(*) begin
+        enc_sign = 1'b0;
+        enc_zero = 1'b0;
+        enc_nar  = nar_out_reg;
+        enc_k    = 0;
+        enc_exp  = 0;
+        enc_frac = 0;
+        enc_flen = 0;
+
+        abs_quire = 0;
+        norm_quire = 0;
+        result_scale = 0;
+        lead_pos = -1;
+        norm_shift = 0;
+        k_int = 0;
+        e_int = 0;
+
+        if (!nar_out_reg) begin
+            if (psum_out_reg == 0) begin
+                enc_zero = 1'b1;
+            end
+            else begin
+                enc_sign = psum_out_reg[QW-1];
+                abs_quire = enc_sign ? -psum_out_reg : psum_out_reg;
+
+                lead_pos = highest_one_pos(abs_quire);
+                result_scale = lead_pos - QF;
+
+                norm_shift = N - lead_pos;
+                if (norm_shift >= 0)
+                    norm_quire = abs_quire << norm_shift;
+                else
+                    norm_quire = abs_quire >> (-norm_shift);
+
+                if (ES == 0) begin
+                    k_int = result_scale;
+                    e_int = 0;
+                end
+                else begin
+                    k_int = result_scale >>> ES;
+                    e_int = result_scale - (k_int <<< ES);
+                end
+
+                if (k_int > (N-2))
+                    k_int = N-2;
+                else if (k_int < -(N-2))
+                    k_int = -(N-2);
+
+                enc_k = k_int[$clog2(N):0];
+                enc_exp = e_int[ES-1:0];
+                enc_frac = norm_quire[N-1:0];
+
+                for (i = 0; i < N; i = i + 1) begin
+                    if (enc_frac[N-1-i])
+                        enc_flen = i + 1;
+                end
+            end
+        end
+    end
 
     //--------------------------------------------------
     // Forwarded outputs
