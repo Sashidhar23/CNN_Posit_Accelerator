@@ -38,7 +38,8 @@ module conv2D #(
 );
 
     localparam integer DOT_LEN = IN_CH * K * K;
-    localparam integer PIPE_CYCLES = (2*ROWS) + (2*COLS) + 4;
+    localparam integer OUT_PIXELS = OUT_H * OUT_W;
+    localparam integer PIXEL_ADDR_W = (OUT_PIXELS <= 2) ? 1 : $clog2(OUT_PIXELS);
     localparam integer ROW_ADDR_W = (ROWS <= 2) ? 1 : $clog2(ROWS);
     localparam integer COL_ADDR_W = (COLS <= 2) ? 1 : $clog2(COLS);
     localparam integer WEIGHT_ADDR_W = (ROWS*COLS <= 2) ? 1 : $clog2(ROWS*COLS);
@@ -46,14 +47,10 @@ module conv2D #(
     localparam [3:0] ST_IDLE       = 4'd0;
     localparam [3:0] ST_INIT_TILE  = 4'd1;
     localparam [3:0] ST_LOAD       = 4'd2;
-    localparam [3:0] ST_WRITE      = 4'd3;
-    localparam [3:0] ST_READ       = 4'd4;
-    localparam [3:0] ST_RUN        = 4'd5;
-    localparam [3:0] ST_ACCUM      = 4'd6;
-    localparam [3:0] ST_NEXT_DOT   = 4'd7;
-    localparam [3:0] ST_STORE      = 4'd8;
-    localparam [3:0] ST_NEXT_TILE  = 4'd9;
-    localparam [3:0] ST_DONE       = 4'd10;
+    localparam [3:0] ST_STREAM     = 4'd3;
+    localparam [3:0] ST_NEXT_DOT   = 4'd4;
+    localparam [3:0] ST_NEXT_TILE  = 4'd5;
+    localparam [3:0] ST_DONE       = 4'd6;
 
     (* ram_style = "block" *) reg [N-1:0] input_mem  [0:IN_CH*IN_H*IN_W-1];
     (* ram_style = "block" *) reg [N-1:0] weight_mem [0:OUT_CH*IN_CH*K*K-1];
@@ -79,47 +76,39 @@ module conv2D #(
     end
 
     reg [3:0] state;
-    reg [31:0] oh;
-    reg [31:0] ow;
     reg [31:0] oc_base;
     reg [31:0] dot_base;
-    reg [31:0] run_count;
     reg [31:0] load_index;
-    reg [31:0] accum_col;
-    reg [COL_ADDR_W:0] store_col;
+    reg [31:0] init_index;
+    reg [31:0] stream_send_count;
+    reg [31:0] stream_recv_count;
 
     reg core_pe_en;
-    reg core_clear_acc;
+    reg core_clear_pipe;
     reg core_wshift;
-    reg core_input_clear;
-    reg core_input_write_en;
-    reg core_input_read_en;
-    reg core_output_clear;
-    reg core_output_write_en;
-    reg core_output_read_en;
-
-    reg core_activation_load_en;
-    reg [ROW_ADDR_W-1:0] core_activation_row;
-    reg [N-1:0] core_activation_data;
-    reg core_activation_vector_load_en;
+    reg core_stream_valid;
+    reg [PIXEL_ADDR_W-1:0] core_stream_tag;
     reg [ROWS*N-1:0] core_activation_vector_data;
     reg core_weight_load_en;
     reg [WEIGHT_ADDR_W-1:0] core_weight_addr;
     reg [N-1:0] core_weight_data;
-    reg [COL_ADDR_W-1:0] core_output_col;
-    reg [N-1:0] acc_reg [0:COLS-1];
 
-    wire [N-1:0] core_output_data;
-    wire [COLS*N-1:0] core_output_vector_data;
-    wire [N-1:0] accum_selected_sum;
-    wire [ROWS-1:0] input_full;
-    wire [ROWS-1:0] input_empty;
+    wire core_result_valid;
+    wire [PIXEL_ADDR_W-1:0] core_result_tag;
+    wire [COLS*N-1:0] core_result_data;
+
+    wire [N-1:0] stream_acc_old [0:COLS-1];
+    wire [N-1:0] stream_acc_sum [0:COLS-1];
 
     integer i;
     integer dot_idx;
     integer load_row;
     integer load_col;
     integer out_ch_idx;
+    integer init_col;
+    integer init_pix;
+    integer stream_y;
+    integer stream_x;
     integer out_index;
 
     function [N-1:0] activation_at;
@@ -147,49 +136,49 @@ module conv2D #(
         end
     endfunction
 
-    posit_adder #(
-        .N(N),
-        .ES(ES)
-    ) TILE_ACCUM_ADDER (
-        .posit_a(acc_reg[accum_col]),
-        .posit_b(core_output_data),
-        .posit_out(accum_selected_sum)
-    );
+    genvar gc;
+    generate
+        for (gc = 0; gc < COLS; gc = gc + 1) begin : STREAM_ACC_GEN
+            assign stream_acc_old[gc] =
+                ((oc_base + gc) < OUT_CH) ?
+                output_mem[((oc_base + gc) * OUT_PIXELS) + core_result_tag] :
+                {N{1'b0}};
 
-    systolic_core_sp701 #(
+            posit_adder #(
+                .N(N),
+                .ES(ES)
+            ) STREAM_ACCUM_ADDER (
+                .posit_a(stream_acc_old[gc]),
+                .posit_b(core_result_data[gc*N +: N]),
+                .posit_out(stream_acc_sum[gc])
+            );
+        end
+    endgenerate
+
+    systolic_stream_core #(
         .N(N),
         .ES(ES),
         .ROWS(ROWS),
         .COLS(COLS),
-        .IN_FIFO_DEPTH(IN_FIFO_DEPTH),
-        .IN_COUNT_W(IN_COUNT_W),
-        .OUT_FIFO_DEPTH(OUT_FIFO_DEPTH),
-        .OUT_COUNT_W(OUT_COUNT_W)
-    ) CORE (
+        .TAG_W(PIXEL_ADDR_W),
+        .ROW_ADDR_W(ROW_ADDR_W),
+        .COL_ADDR_W(COL_ADDR_W),
+        .WEIGHT_ADDR_W(WEIGHT_ADDR_W)
+    ) STREAM_CORE (
         .clk(clk),
         .reset(reset),
         .pe_en(core_pe_en),
-        .clear_acc(core_clear_acc),
+        .clear_pipe(core_clear_pipe),
         .wshift(core_wshift),
-        .activation_load_en(core_activation_load_en),
-        .activation_row(core_activation_row),
-        .activation_data(core_activation_data),
-        .activation_vector_load_en(core_activation_vector_load_en),
-        .activation_vector_data(core_activation_vector_data),
+        .activation_in(core_activation_vector_data),
+        .stream_valid(core_stream_valid),
+        .stream_tag(core_stream_tag),
         .weight_load_en(core_weight_load_en),
         .weight_addr(core_weight_addr),
         .weight_data(core_weight_data),
-        .input_clear(core_input_clear),
-        .input_write_en(core_input_write_en),
-        .input_read_en(core_input_read_en),
-        .output_clear(core_output_clear),
-        .output_write_en(core_output_write_en),
-        .output_read_en(core_output_read_en),
-        .output_col(core_output_col),
-        .output_data(core_output_data),
-        .output_vector_data(core_output_vector_data),
-        .input_full(input_full),
-        .input_empty(input_empty)
+        .result_valid(core_result_valid),
+        .result_tag(core_result_tag),
+        .result_data(core_result_data)
     );
 
     always @(posedge clk) begin
@@ -197,48 +186,28 @@ module conv2D #(
             state <= ST_IDLE;
             busy <= 1'b0;
             done <= 1'b0;
-            oh <= 0;
-            ow <= 0;
             oc_base <= 0;
             dot_base <= 0;
-            run_count <= 0;
             load_index <= 0;
-            accum_col <= 0;
-            store_col <= 0;
+            init_index <= 0;
+            stream_send_count <= 0;
+            stream_recv_count <= 0;
             core_pe_en <= 1'b0;
-            core_clear_acc <= 1'b0;
+            core_clear_pipe <= 1'b0;
             core_wshift <= 1'b0;
-            core_input_clear <= 1'b1;
-            core_input_write_en <= 1'b0;
-            core_input_read_en <= 1'b0;
-            core_output_clear <= 1'b1;
-            core_output_write_en <= 1'b0;
-            core_output_read_en <= 1'b0;
-            core_activation_load_en <= 1'b0;
-            core_activation_row <= {ROW_ADDR_W{1'b0}};
-            core_activation_data <= {N{1'b0}};
-            core_activation_vector_load_en <= 1'b0;
+            core_stream_valid <= 1'b0;
+            core_stream_tag <= {PIXEL_ADDR_W{1'b0}};
             core_activation_vector_data <= {ROWS*N{1'b0}};
             core_weight_load_en <= 1'b0;
             core_weight_addr <= {WEIGHT_ADDR_W{1'b0}};
             core_weight_data <= {N{1'b0}};
-            core_output_col <= {COL_ADDR_W{1'b0}};
-            for (i = 0; i < COLS; i = i + 1)
-                acc_reg[i] <= {N{1'b0}};
         end
         else begin
             core_pe_en <= 1'b0;
-            core_clear_acc <= 1'b0;
+            core_clear_pipe <= 1'b0;
             core_wshift <= 1'b0;
-            core_input_clear <= 1'b0;
-            core_input_write_en <= 1'b0;
-            core_input_read_en <= 1'b0;
-            core_output_clear <= 1'b0;
-            core_output_write_en <= 1'b0;
-            core_output_read_en <= 1'b0;
-            core_activation_load_en <= 1'b0;
-            core_activation_data <= {N{1'b0}};
-            core_activation_vector_load_en <= 1'b0;
+            core_stream_valid <= 1'b0;
+            core_stream_tag <= {PIXEL_ADDR_W{1'b0}};
             core_activation_vector_data <= {ROWS*N{1'b0}};
             core_weight_load_en <= 1'b0;
             core_weight_data <= {N{1'b0}};
@@ -249,28 +218,28 @@ module conv2D #(
                     busy <= 1'b0;
                     if (start) begin
                         busy <= 1'b1;
-                        oh <= 0;
-                        ow <= 0;
                         oc_base <= 0;
                         dot_base <= 0;
-                        core_input_clear <= 1'b1;
-                        core_output_clear <= 1'b1;
+                        init_index <= 0;
                         state <= ST_INIT_TILE;
                     end
                 end
 
                 ST_INIT_TILE: begin
-                    for (i = 0; i < COLS; i = i + 1) begin
-                        if ((oc_base + i) < OUT_CH)
-                            acc_reg[i] <= bias_mem[oc_base + i];
-                        else
-                            acc_reg[i] <= {N{1'b0}};
+                    if (init_index < OUT_PIXELS*COLS) begin
+                        init_col = init_index / OUT_PIXELS;
+                        init_pix = init_index - (init_col * OUT_PIXELS);
+                        if ((oc_base + init_col) < OUT_CH) begin
+                            out_index = ((oc_base + init_col) * OUT_PIXELS) + init_pix;
+                            output_mem[out_index] <= bias_mem[oc_base + init_col];
+                        end
+                        init_index <= init_index + 1;
                     end
-                    dot_base <= 0;
-                    core_input_clear <= 1'b1;
-                    core_output_clear <= 1'b1;
-                    load_index <= 0;
-                    state <= ST_LOAD;
+                    else begin
+                        dot_base <= 0;
+                        load_index <= 0;
+                        state <= ST_LOAD;
+                    end
                 end
 
                 ST_LOAD: begin
@@ -291,81 +260,53 @@ module conv2D #(
                         load_index <= load_index + 1;
                     end
                     else begin
-                        core_clear_acc <= 1'b1;
+                        core_clear_pipe <= 1'b1;
                         core_wshift <= 1'b1;
-                        load_index <= 0;
-                        state <= ST_WRITE;
+                        stream_send_count <= 0;
+                        stream_recv_count <= 0;
+                        state <= ST_STREAM;
                     end
                 end
 
-                ST_WRITE: begin
-                    if (load_index < ROWS) begin
-                        dot_idx = dot_base + load_index;
-                        core_activation_load_en <= 1'b1;
-                        core_activation_row <= load_index[ROW_ADDR_W-1:0];
-                        core_activation_data <= activation_at(dot_idx, oh, ow);
-                        load_index <= load_index + 1;
+                ST_STREAM: begin
+                    if (core_result_valid) begin
+                        for (i = 0; i < COLS; i = i + 1) begin
+                            if ((oc_base + i) < OUT_CH) begin
+                                out_index = ((oc_base + i) * OUT_PIXELS) + core_result_tag;
+                                output_mem[out_index] <= stream_acc_sum[i];
+                            end
+                        end
+                        stream_recv_count <= stream_recv_count + 1;
                     end
-                    else begin
-                        core_input_write_en <= 1'b1;
-                        load_index <= 0;
-                        state <= ST_READ;
+
+                    if (stream_send_count < OUT_PIXELS) begin
+                        stream_y = stream_send_count / OUT_W;
+                        stream_x = stream_send_count - (stream_y * OUT_W);
+
+                        for (i = 0; i < ROWS; i = i + 1) begin
+                            dot_idx = dot_base + i;
+                            core_activation_vector_data[i*N +: N] <= activation_at(dot_idx, stream_y, stream_x);
+                        end
+
+                        core_stream_valid <= 1'b1;
+                        core_stream_tag <= stream_send_count[PIXEL_ADDR_W-1:0];
+                        core_pe_en <= 1'b1;
+                        stream_send_count <= stream_send_count + 1;
                     end
-                end
-
-                ST_READ: begin
-                    core_input_read_en <= 1'b1;
-                    run_count <= 0;
-                    state <= ST_RUN;
-                end
-
-                ST_RUN: begin
-                    core_pe_en <= 1'b1;
-                    core_output_write_en <= 1'b1;
-                    if (run_count == PIPE_CYCLES-1) begin
-                        accum_col <= 0;
-                        core_output_col <= {COL_ADDR_W{1'b0}};
-                        state <= ST_ACCUM;
+                    else if (!(core_result_valid && (stream_recv_count == OUT_PIXELS-1))) begin
+                        core_pe_en <= 1'b1;
                     end
-                    else begin
-                        run_count <= run_count + 1;
-                    end
-                end
 
-                ST_ACCUM: begin
-                    if ((oc_base + accum_col) < OUT_CH)
-                        acc_reg[accum_col] <= accum_selected_sum;
-
-                    if (accum_col == COLS-1) begin
+                    if (core_result_valid && (stream_recv_count == OUT_PIXELS-1)) begin
                         state <= ST_NEXT_DOT;
-                    end
-                    else begin
-                        accum_col <= accum_col + 1;
-                        core_output_col <= core_output_col + 1'b1;
                     end
                 end
 
                 ST_NEXT_DOT: begin
                     if ((dot_base + ROWS) < DOT_LEN) begin
                         dot_base <= dot_base + ROWS;
-                        core_input_clear <= 1'b1;
-                        core_output_clear <= 1'b1;
                         load_index <= 0;
                         state <= ST_LOAD;
-                    end
-                    else begin
-                        store_col <= 0;
-                        state <= ST_STORE;
-                    end
-                end
-
-                ST_STORE: begin
-                    if (store_col < COLS) begin
-                        if ((oc_base + store_col) < OUT_CH) begin
-                            out_index = ((oc_base + store_col) * OUT_H * OUT_W) + (oh * OUT_W) + ow;
-                            output_mem[out_index] <= acc_reg[store_col];
-                        end
-                        store_col <= store_col + 1;
                     end
                     else begin
                         state <= ST_NEXT_TILE;
@@ -375,24 +316,11 @@ module conv2D #(
                 ST_NEXT_TILE: begin
                     if ((oc_base + COLS) < OUT_CH) begin
                         oc_base <= oc_base + COLS;
+                        init_index <= 0;
                         state <= ST_INIT_TILE;
                     end
                     else begin
-                        oc_base <= 0;
-                        if (ow + 1 < OUT_W) begin
-                            ow <= ow + 1;
-                            state <= ST_INIT_TILE;
-                        end
-                        else begin
-                            ow <= 0;
-                            if (oh + 1 < OUT_H) begin
-                                oh <= oh + 1;
-                                state <= ST_INIT_TILE;
-                            end
-                            else begin
-                                state <= ST_DONE;
-                            end
-                        end
+                        state <= ST_DONE;
                     end
                 end
 
