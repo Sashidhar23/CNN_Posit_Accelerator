@@ -180,6 +180,8 @@ module reduced_vgg16_mnist_tiled_core #(
     localparam [N-1:0] POSIT_NAR  = {1'b1, {(N-1){1'b0}}};
 
     (* ram_style = "distributed" *) reg [N-1:0] tile_out [0:(COLS*MAX_OUT_PIXELS)-1];
+    (* ram_style = "distributed" *) reg signed [QW-1:0] quire_tile_out [0:(COLS*MAX_OUT_PIXELS)-1];
+    reg quire_tile_nar [0:(COLS*MAX_OUT_PIXELS)-1];
     (* ram_style = "distributed" *) reg [N-1:0] logit_mem [0:NUM_CLASSES-1];
     reg [N-1:0] bias_tile [0:COLS-1];
 
@@ -244,6 +246,7 @@ module reduced_vgg16_mnist_tiled_core #(
 
     wire core_result_valid;
     wire [PIXEL_ADDR_W-1:0] core_result_tag;
+    wire [COLS*QW-1:0] core_result_quire_data;
     wire [COLS*N-1:0] core_result_data;
     wire [COLS-1:0] core_result_is_nar;
 
@@ -251,6 +254,13 @@ module reduced_vgg16_mnist_tiled_core #(
     wire [N-1:0] pool_single_out;
     wire [N-1:0] stream_acc_old [0:COLS-1];
     wire [N-1:0] stream_acc_sum [0:COLS-1];
+    wire [N-1:0] stream_acc_write [0:COLS-1];
+    wire signed [QW-1:0] bias_quire [0:COLS-1];
+    wire bias_quire_nar [0:COLS-1];
+    wire signed [QW-1:0] quire_acc_old [0:COLS-1];
+    wire quire_acc_old_nar [0:COLS-1];
+    wire signed [QW-1:0] quire_acc_sum [0:COLS-1];
+    wire quire_acc_sum_nar [0:COLS-1];
 
     integer i;
     integer load_row;
@@ -508,27 +518,80 @@ module reduced_vgg16_mnist_tiled_core #(
 
     genvar gc;
     generate
-        for (gc = 0; gc < COLS; gc = gc + 1) begin : STREAM_ACC_GEN
-            assign stream_acc_old[gc] =
-                ((oc_base + gc) < cur_out_ch &&
-                 core_result_tag < MAX_OUT_PIXELS) ?
-                tile_out[(gc * MAX_OUT_PIXELS) + core_result_tag] :
-                POSIT_ZERO;
+        if (USE_QUIRE == 0) begin : REGULAR_ACCUM_GEN
+            for (gc = 0; gc < COLS; gc = gc + 1) begin : STREAM_ACC_GEN
+                assign stream_acc_old[gc] =
+                    ((oc_base + gc) < cur_out_ch &&
+                     core_result_tag < MAX_OUT_PIXELS) ?
+                    tile_out[(gc * MAX_OUT_PIXELS) + core_result_tag] :
+                    POSIT_ZERO;
 
-            posit_adder #(
-                .N(N),
-                .ES(ES)
-            ) STREAM_ACCUM_ADDER (
-                .posit_a(stream_acc_old[gc]),
-                .posit_b(core_result_data[gc*N +: N]),
-                .posit_out(stream_acc_sum[gc])
-            );
+                posit_adder #(
+                    .N(N),
+                    .ES(ES)
+                ) STREAM_ACCUM_ADDER (
+                    .posit_a(stream_acc_old[gc]),
+                    .posit_b(core_result_data[gc*N +: N]),
+                    .posit_out(stream_acc_sum[gc])
+                );
+
+                assign stream_acc_write[gc] = stream_acc_sum[gc];
+                assign bias_quire[gc] = {QW{1'b0}};
+                assign bias_quire_nar[gc] = 1'b0;
+                assign quire_acc_old[gc] = {QW{1'b0}};
+                assign quire_acc_old_nar[gc] = 1'b0;
+                assign quire_acc_sum[gc] = {QW{1'b0}};
+                assign quire_acc_sum_nar[gc] = 1'b0;
+            end
+        end
+        else begin : QUIRE_ACCUM_GEN
+            for (gc = 0; gc < COLS; gc = gc + 1) begin : STREAM_ACC_GEN
+                posit_to_quire #(
+                    .N(N),
+                    .ES(ES),
+                    .QW(QW),
+                    .QF(QF)
+                ) BIAS_TO_QUIRE (
+                    .posit_in  (bias_tile[gc]),
+                    .quire_out (bias_quire[gc]),
+                    .is_nar    (bias_quire_nar[gc])
+                );
+
+                assign stream_acc_old[gc] = POSIT_ZERO;
+                assign stream_acc_sum[gc] = POSIT_ZERO;
+                assign quire_acc_old[gc] =
+                    ((oc_base + gc) < cur_out_ch &&
+                     core_result_tag < MAX_OUT_PIXELS) ?
+                    quire_tile_out[(gc * MAX_OUT_PIXELS) + core_result_tag] :
+                    {QW{1'b0}};
+                assign quire_acc_old_nar[gc] =
+                    ((oc_base + gc) < cur_out_ch &&
+                     core_result_tag < MAX_OUT_PIXELS) ?
+                    quire_tile_nar[(gc * MAX_OUT_PIXELS) + core_result_tag] :
+                    1'b0;
+                (* use_dsp = "yes" *) assign quire_acc_sum[gc] =
+                    quire_acc_old[gc] + core_result_quire_data[gc*QW +: QW];
+                assign quire_acc_sum_nar[gc] =
+                    quire_acc_old_nar[gc] | core_result_is_nar[gc];
+
+                quire_to_posit #(
+                    .N(N),
+                    .ES(ES),
+                    .QW(QW),
+                    .QF(QF)
+                ) QSUM_TO_POSIT (
+                    .quire_in  (quire_acc_sum[gc]),
+                    .is_nar    (quire_acc_sum_nar[gc]),
+                    .posit_out (stream_acc_write[gc])
+                );
+            end
         end
     endgenerate
 
     generate
         if (USE_QUIRE == 0) begin : REGULAR_CORE
             assign core_result_is_nar = {COLS{1'b0}};
+            assign core_result_quire_data = {COLS*QW{1'b0}};
 
             systolic_stream_core #(
                 .N(N),
@@ -582,6 +645,7 @@ module reduced_vgg16_mnist_tiled_core #(
                 .weight_data(core_weight_data),
                 .result_valid(core_result_valid),
                 .result_tag(core_result_tag),
+                .result_quire_data(core_result_quire_data),
                 .result_data(core_result_data),
                 .result_is_nar(core_result_is_nar)
             );
@@ -690,8 +754,13 @@ module reduced_vgg16_mnist_tiled_core #(
                     if ((oc_base + i) < cur_out_ch) begin
                         out_index = (i * MAX_OUT_PIXELS) + core_result_tag;
                         if (out_index < COLS*MAX_OUT_PIXELS) begin
-                            tile_out[out_index] <= core_result_is_nar[i] ?
-                                POSIT_NAR : stream_acc_sum[i];
+                            if (USE_QUIRE != 0) begin
+                                quire_tile_out[out_index] <= quire_acc_sum[i];
+                                quire_tile_nar[out_index] <= quire_acc_sum_nar[i];
+                            end
+                            tile_out[out_index] <=
+                                ((USE_QUIRE != 0) ? quire_acc_sum_nar[i] : core_result_is_nar[i]) ?
+                                POSIT_NAR : stream_acc_write[i];
                         end
                     end
                 end
@@ -767,8 +836,13 @@ module reduced_vgg16_mnist_tiled_core #(
                 ST_INIT_TILE: begin
                     if (init_col < COLS && (oc_base + init_col) < cur_out_ch) begin
                         out_index = (init_col * MAX_OUT_PIXELS) + init_pix;
-                        if (out_index < COLS*MAX_OUT_PIXELS)
+                        if (out_index < COLS*MAX_OUT_PIXELS) begin
                             tile_out[out_index] <= bias_tile[init_col];
+                            if (USE_QUIRE != 0) begin
+                                quire_tile_out[out_index] <= bias_quire[init_col];
+                                quire_tile_nar[out_index] <= bias_quire_nar[init_col];
+                            end
+                        end
                     end
 
                     if (init_col >= COLS-1 && init_pix >= cur_out_pixels-1) begin
