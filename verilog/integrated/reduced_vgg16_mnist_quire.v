@@ -1,3 +1,5 @@
+`timescale 1ns / 1ps
+
 module reduced_vgg16_mnist_quire #(
     parameter N = 8,
     parameter ES = 1,
