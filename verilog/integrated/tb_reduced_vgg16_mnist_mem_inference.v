@@ -112,6 +112,7 @@ module tb_reduced_vgg16_mnist_mem_inference;
     integer errors;
     integer correct_count;
     integer test_image;
+    integer run_images;
     integer image_base;
     integer predicted_class [0:NUM_TEST_IMAGES-1];
     integer expected_class_int [0:NUM_TEST_IMAGES-1];
@@ -294,6 +295,7 @@ module tb_reduced_vgg16_mnist_mem_inference;
         errors = 0;
         correct_count = 0;
         test_image = 0;
+        run_images = NUM_TEST_IMAGES;
         image_base = 0;
         zero_logit_count = 0;
 
@@ -318,6 +320,15 @@ module tb_reduced_vgg16_mnist_mem_inference;
 
         read_all_memories();
 
+        if ($value$plusargs("max_images=%d", run_images)) begin
+            if (run_images < 1)
+                run_images = 1;
+            else if (run_images > NUM_TEST_IMAGES)
+                run_images = NUM_TEST_IMAGES;
+        end
+        if ($test$plusargs("one_image"))
+            run_images = 1;
+
         repeat (8) @(posedge clk);
         reset = 1'b0;
         repeat (2) @(posedge clk);
@@ -341,9 +352,9 @@ module tb_reduced_vgg16_mnist_mem_inference;
             `LOAD_WB(4'd11, l11_w, L11_W_SIZE, l11_b, NUM_CLASSES, "classifier.3")
         end
 
-        $display("Weight and bias load complete; starting 10-image inference run");
+        $display("Weight and bias load complete; starting %0d-image inference run", run_images);
 
-        for (test_image = 0; test_image < NUM_TEST_IMAGES; test_image = test_image + 1) begin
+        for (test_image = 0; test_image < run_images; test_image = test_image + 1) begin
             image_base = test_image * IMAGE_SIZE;
             timeout = 0;
 
@@ -405,10 +416,10 @@ module tb_reduced_vgg16_mnist_mem_inference;
 
         $display("------------------------------------------------------------");
         $display("Image predictions summary:");
-        for (i = 0; i < NUM_TEST_IMAGES; i = i + 1)
+        for (i = 0; i < run_images; i = i + 1)
             $display("  image %0d predicted=%0d expected=%0d",
                      i, predicted_class[i], expected_class_int[i]);
-        $display("Accuracy = %0d / %0d", correct_count, NUM_TEST_IMAGES);
+        $display("Accuracy = %0d / %0d", correct_count, run_images);
 
         if (errors == 0)
             $display("tb_reduced_vgg16_mnist_mem_inference PASS");
