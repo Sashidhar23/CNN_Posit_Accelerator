@@ -62,7 +62,7 @@ module pe_quire #(
     // This forwards activation horizontally across row
     //--------------------------------------------------
     always @(posedge clk) begin
-        if (reset) begin
+        if (reset || clear_acc) begin
             input_reg <= {N{1'b0}};
         end
         else if (pe_en) begin
