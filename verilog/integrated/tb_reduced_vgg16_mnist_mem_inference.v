@@ -23,6 +23,7 @@ module tb_reduced_vgg16_mnist_mem_inference;
     localparam integer NUM_TEST_IMAGES = 10;
     localparam integer IMAGE_SIZE = IN_CH * IN_H * IN_W;
     localparam integer MAX_INFERENCE_CYCLES = 500000000;
+    localparam integer FAST_BACKDOOR_LOAD = 1;
 
     localparam integer L0_W_SIZE  = C1 * IN_CH * 3 * 3;
     localparam integer L1_W_SIZE  = C1 * C1 * 3 * 3;
@@ -36,6 +37,32 @@ module tb_reduced_vgg16_mnist_mem_inference;
     localparam integer L9_W_SIZE  = C4 * C4 * 3 * 3;
     localparam integer L10_W_SIZE = FC1 * C4;
     localparam integer L11_W_SIZE = NUM_CLASSES * FC1;
+
+    localparam integer L0_W_BASE  = 0;
+    localparam integer L1_W_BASE  = L0_W_BASE  + L0_W_SIZE;
+    localparam integer L2_W_BASE  = L1_W_BASE  + L1_W_SIZE;
+    localparam integer L3_W_BASE  = L2_W_BASE  + L2_W_SIZE;
+    localparam integer L4_W_BASE  = L3_W_BASE  + L3_W_SIZE;
+    localparam integer L5_W_BASE  = L4_W_BASE  + L4_W_SIZE;
+    localparam integer L6_W_BASE  = L5_W_BASE  + L5_W_SIZE;
+    localparam integer L7_W_BASE  = L6_W_BASE  + L6_W_SIZE;
+    localparam integer L8_W_BASE  = L7_W_BASE  + L7_W_SIZE;
+    localparam integer L9_W_BASE  = L8_W_BASE  + L8_W_SIZE;
+    localparam integer L10_W_BASE = L9_W_BASE  + L9_W_SIZE;
+    localparam integer L11_W_BASE = L10_W_BASE + L10_W_SIZE;
+
+    localparam integer L0_B_BASE  = 0;
+    localparam integer L1_B_BASE  = L0_B_BASE  + C1;
+    localparam integer L2_B_BASE  = L1_B_BASE  + C1;
+    localparam integer L3_B_BASE  = L2_B_BASE  + C2;
+    localparam integer L4_B_BASE  = L3_B_BASE  + C2;
+    localparam integer L5_B_BASE  = L4_B_BASE  + C3;
+    localparam integer L6_B_BASE  = L5_B_BASE  + C3;
+    localparam integer L7_B_BASE  = L6_B_BASE  + C3;
+    localparam integer L8_B_BASE  = L7_B_BASE  + C4;
+    localparam integer L9_B_BASE  = L8_B_BASE  + C4;
+    localparam integer L10_B_BASE = L9_B_BASE  + C4;
+    localparam integer L11_B_BASE = L10_B_BASE + FC1;
 
     reg clk;
     reg reset;
@@ -186,6 +213,57 @@ module tb_reduced_vgg16_mnist_mem_inference;
         end
     endtask
 
+    task preload_image_fast;
+        input integer array_base;
+        begin
+            for (i = 0; i < IMAGE_SIZE; i = i + 1)
+                DUT.CORE.feature_a[i] = pixels[array_base + i];
+            $display("Fast-loaded image %0d into shared feature_a input buffer", test_image);
+        end
+    endtask
+
+    task preload_weights_fast;
+        begin
+            for (i = 0; i < L0_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L0_W_BASE + i] = l0_w[i];
+            for (i = 0; i < C1; i = i + 1) DUT.CORE.bias_mem[L0_B_BASE + i] = l0_b[i];
+
+            for (i = 0; i < L1_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L1_W_BASE + i] = l1_w[i];
+            for (i = 0; i < C1; i = i + 1) DUT.CORE.bias_mem[L1_B_BASE + i] = l1_b[i];
+
+            for (i = 0; i < L2_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L2_W_BASE + i] = l2_w[i];
+            for (i = 0; i < C2; i = i + 1) DUT.CORE.bias_mem[L2_B_BASE + i] = l2_b[i];
+
+            for (i = 0; i < L3_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L3_W_BASE + i] = l3_w[i];
+            for (i = 0; i < C2; i = i + 1) DUT.CORE.bias_mem[L3_B_BASE + i] = l3_b[i];
+
+            for (i = 0; i < L4_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L4_W_BASE + i] = l4_w[i];
+            for (i = 0; i < C3; i = i + 1) DUT.CORE.bias_mem[L4_B_BASE + i] = l4_b[i];
+
+            for (i = 0; i < L5_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L5_W_BASE + i] = l5_w[i];
+            for (i = 0; i < C3; i = i + 1) DUT.CORE.bias_mem[L5_B_BASE + i] = l5_b[i];
+
+            for (i = 0; i < L6_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L6_W_BASE + i] = l6_w[i];
+            for (i = 0; i < C3; i = i + 1) DUT.CORE.bias_mem[L6_B_BASE + i] = l6_b[i];
+
+            for (i = 0; i < L7_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L7_W_BASE + i] = l7_w[i];
+            for (i = 0; i < C4; i = i + 1) DUT.CORE.bias_mem[L7_B_BASE + i] = l7_b[i];
+
+            for (i = 0; i < L8_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L8_W_BASE + i] = l8_w[i];
+            for (i = 0; i < C4; i = i + 1) DUT.CORE.bias_mem[L8_B_BASE + i] = l8_b[i];
+
+            for (i = 0; i < L9_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L9_W_BASE + i] = l9_w[i];
+            for (i = 0; i < C4; i = i + 1) DUT.CORE.bias_mem[L9_B_BASE + i] = l9_b[i];
+
+            for (i = 0; i < L10_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L10_W_BASE + i] = l10_w[i];
+            for (i = 0; i < FC1; i = i + 1) DUT.CORE.bias_mem[L10_B_BASE + i] = l10_b[i];
+
+            for (i = 0; i < L11_W_SIZE; i = i + 1) DUT.CORE.weight_mem[L11_W_BASE + i] = l11_w[i];
+            for (i = 0; i < NUM_CLASSES; i = i + 1) DUT.CORE.bias_mem[L11_B_BASE + i] = l11_b[i];
+
+            $display("Fast-loaded all weights and biases into shared memories by simulation backdoor");
+        end
+    endtask
+
 `define LOAD_INPUT(ARRAY_BASE) \
     begin \
         for (i = 0; i < IMAGE_SIZE; i = i + 1) \
@@ -245,18 +323,23 @@ module tb_reduced_vgg16_mnist_mem_inference;
         repeat (2) @(posedge clk);
 
         $display("Starting full VGG16-MNIST posit<8,1> inference memory load");
-        `LOAD_WB(4'd0,  l0_w,  L0_W_SIZE,  l0_b,  C1,          "features.0")
-        `LOAD_WB(4'd1,  l1_w,  L1_W_SIZE,  l1_b,  C1,          "features.2")
-        `LOAD_WB(4'd2,  l2_w,  L2_W_SIZE,  l2_b,  C2,          "features.5")
-        `LOAD_WB(4'd3,  l3_w,  L3_W_SIZE,  l3_b,  C2,          "features.7")
-        `LOAD_WB(4'd4,  l4_w,  L4_W_SIZE,  l4_b,  C3,          "features.10")
-        `LOAD_WB(4'd5,  l5_w,  L5_W_SIZE,  l5_b,  C3,          "features.12")
-        `LOAD_WB(4'd6,  l6_w,  L6_W_SIZE,  l6_b,  C3,          "features.14")
-        `LOAD_WB(4'd7,  l7_w,  L7_W_SIZE,  l7_b,  C4,          "features.17")
-        `LOAD_WB(4'd8,  l8_w,  L8_W_SIZE,  l8_b,  C4,          "features.19")
-        `LOAD_WB(4'd9,  l9_w,  L9_W_SIZE,  l9_b,  C4,          "features.21")
-        `LOAD_WB(4'd10, l10_w, L10_W_SIZE, l10_b, FC1,         "classifier.0")
-        `LOAD_WB(4'd11, l11_w, L11_W_SIZE, l11_b, NUM_CLASSES, "classifier.3")
+        if (FAST_BACKDOOR_LOAD) begin
+            preload_weights_fast();
+        end
+        else begin
+            `LOAD_WB(4'd0,  l0_w,  L0_W_SIZE,  l0_b,  C1,          "features.0")
+            `LOAD_WB(4'd1,  l1_w,  L1_W_SIZE,  l1_b,  C1,          "features.2")
+            `LOAD_WB(4'd2,  l2_w,  L2_W_SIZE,  l2_b,  C2,          "features.5")
+            `LOAD_WB(4'd3,  l3_w,  L3_W_SIZE,  l3_b,  C2,          "features.7")
+            `LOAD_WB(4'd4,  l4_w,  L4_W_SIZE,  l4_b,  C3,          "features.10")
+            `LOAD_WB(4'd5,  l5_w,  L5_W_SIZE,  l5_b,  C3,          "features.12")
+            `LOAD_WB(4'd6,  l6_w,  L6_W_SIZE,  l6_b,  C3,          "features.14")
+            `LOAD_WB(4'd7,  l7_w,  L7_W_SIZE,  l7_b,  C4,          "features.17")
+            `LOAD_WB(4'd8,  l8_w,  L8_W_SIZE,  l8_b,  C4,          "features.19")
+            `LOAD_WB(4'd9,  l9_w,  L9_W_SIZE,  l9_b,  C4,          "features.21")
+            `LOAD_WB(4'd10, l10_w, L10_W_SIZE, l10_b, FC1,         "classifier.0")
+            `LOAD_WB(4'd11, l11_w, L11_W_SIZE, l11_b, NUM_CLASSES, "classifier.3")
+        end
 
         $display("Weight and bias load complete; starting 10-image inference run");
 
@@ -266,7 +349,10 @@ module tb_reduced_vgg16_mnist_mem_inference;
 
             $display("------------------------------------------------------------");
             $display("Image %0d expected digit %0d", test_image, expected_class[test_image]);
-            `LOAD_INPUT(image_base)
+            if (FAST_BACKDOOR_LOAD)
+                preload_image_fast(image_base);
+            else
+                `LOAD_INPUT(image_base)
 
             @(posedge clk);
             start = 1'b1;
