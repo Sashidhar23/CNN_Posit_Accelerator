@@ -12,7 +12,7 @@ module cnn_zynq_axi_master_wrapper #(
     parameter integer C_M_AXI_ID_WIDTH = 1,
     parameter N = 8,
     parameter ES = 1,
-    parameter USE_QUIRE = 0,
+    parameter USE_QUIRE = 1,
     parameter QW = 48,
     parameter QF = QW / 2,
     parameter IN_CH = 1,
@@ -24,8 +24,8 @@ module cnn_zynq_axi_master_wrapper #(
     parameter C4 = 512,
     parameter FC1 = 256,
     parameter NUM_CLASSES = 10,
-    parameter ROWS = 3,
-    parameter COLS = 3,
+    parameter ROWS = 4,
+    parameter COLS = 4,
     parameter CLASS_W = (NUM_CLASSES <= 2) ? 1 : $clog2(NUM_CLASSES),
     parameter H1 = IN_H,
     parameter W1 = IN_W,
@@ -272,8 +272,10 @@ module cnn_zynq_axi_master_wrapper #(
     (* ram_style = "block" *) reg [N-1:0] feature_bank1 [0:MAX_FEATURE_VALUES-1];
 
     wire reset = ~aresetn;
-    wire [3:0] aw_word_addr = awaddr_hold[ADDR_LSB +: 4];
-    wire [3:0] ar_word_addr = s_axi_araddr[ADDR_LSB +: 4];
+    // AXI4-Lite registers are 32-bit word addressed at byte bits [5:2].
+    // Fixed indices keep Vivado IP-integrator OOC synthesis parameter-safe.
+    wire [3:0] aw_word_addr = awaddr_hold[5:2];
+    wire [3:0] ar_word_addr = s_axi_araddr[5:2];
     wire write_commit = aw_hold && w_hold && !s_axi_bvalid;
 
     assign s_axi_awready = !aw_hold && !s_axi_bvalid;
@@ -464,7 +466,9 @@ module cnn_zynq_axi_master_wrapper #(
                     REG_BIAS_BASE:   s_axi_rdata[31:0] <= bias_base_addr;
                     REG_IMAGE_BASE:  s_axi_rdata[31:0] <= image_base_addr;
                     REG_TIMEOUT:     s_axi_rdata[31:0] <= timeout_limit;
-                    REG_CLASS:       s_axi_rdata[CLASS_W-1:0] <= dut_class_out;
+                    // Whole-vector assignment safely zero-extends/truncates for
+                    // AXI-Lite and avoids a module-reference parameter part-select.
+                    REG_CLASS:       s_axi_rdata <= dut_class_out;
                     REG_LOGIT_ADDR:  s_axi_rdata[31:0] <= dut_logit_addr;
                     REG_LOGIT_DATA:  s_axi_rdata[N-1:0] <= dut_logit_data;
                     REG_DEBUG_STATE: s_axi_rdata[3:0] <= state;
