@@ -12,8 +12,8 @@ module tb_reduced_vgg16_mnist_mem_inference;
     localparam C4 = 512;
     localparam FC1 = 256;
     localparam NUM_CLASSES = 10;
-    localparam ROWS = 3;
-    localparam COLS = 3;
+    localparam ROWS = 4;
+    localparam COLS = 4;
     localparam CLASS_W = 4;
 
     localparam [1:0] CFG_INPUT  = 2'd0;
@@ -188,6 +188,23 @@ module tb_reduced_vgg16_mnist_mem_inference;
 
     always #5 clk = ~clk;
 
+    // The supplied PyTorch parameter export stores a negative value as
+    // {1'b1, positive_posit_magnitude}.  Standard Posit uses two's-complement
+    // negation of the complete word, which is also what posit_decoder expects.
+    function [N-1:0] canonical_parameter;
+        input [N-1:0] source_value;
+        reg [N-1:0] magnitude;
+        begin
+            magnitude = {1'b0, source_value[N-2:0]};
+            if (!source_value[N-1])
+                canonical_parameter = source_value;
+            else if (magnitude == {N{1'b0}})
+                canonical_parameter = {N{1'b0}};
+            else
+                canonical_parameter = (~magnitude) + 1'b1;
+        end
+    endfunction
+
     function [N-1:0] weight_lookup;
         input [3:0] layer_id;
         input [31:0] addr;
@@ -242,9 +259,11 @@ module tb_reduced_vgg16_mnist_mem_inference;
         else begin
             param_resp_valid <= param_req_valid;
             if (param_req_valid && param_req_kind == PARAM_WEIGHT)
-                param_resp_data <= weight_lookup(param_req_layer, param_req_addr);
+                param_resp_data <= canonical_parameter(
+                    weight_lookup(param_req_layer, param_req_addr));
             else if (param_req_valid && param_req_kind == PARAM_BIAS)
-                param_resp_data <= bias_lookup(param_req_layer, param_req_addr);
+                param_resp_data <= canonical_parameter(
+                    bias_lookup(param_req_layer, param_req_addr));
             else
                 param_resp_data <= {N{1'b0}};
 

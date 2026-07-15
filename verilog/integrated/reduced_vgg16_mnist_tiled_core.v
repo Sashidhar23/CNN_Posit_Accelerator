@@ -15,8 +15,8 @@ module reduced_vgg16_mnist_tiled_core #(
     parameter C4 = 512,
     parameter FC1 = 256,
     parameter NUM_CLASSES = 10,
-    parameter ROWS = 3,
-    parameter COLS = 3,
+    parameter ROWS = 4,
+    parameter COLS = 4,
     parameter CLASS_W = (NUM_CLASSES <= 2) ? 1 : $clog2(NUM_CLASSES),
     parameter H1 = IN_H,
     parameter W1 = IN_W,
@@ -150,6 +150,7 @@ module reduced_vgg16_mnist_tiled_core #(
     localparam integer ROW_ADDR_W = (ROWS <= 2) ? 1 : $clog2(ROWS);
     localparam integer COL_ADDR_W = (COLS <= 2) ? 1 : $clog2(COLS);
     localparam integer WEIGHT_ADDR_W = (ROWS*COLS <= 2) ? 1 : $clog2(ROWS*COLS);
+    localparam integer ACC_W = (USE_QUIRE != 0) ? (QW + 1) : N;
 
     localparam [5:0] ST_IDLE              = 6'd0;
     localparam [5:0] ST_SETUP_LAYER       = 6'd1;
@@ -179,9 +180,16 @@ module reduced_vgg16_mnist_tiled_core #(
     localparam [N-1:0] POSIT_ZERO = {N{1'b0}};
     localparam [N-1:0] POSIT_NAR  = {1'b1, {(N-1){1'b0}}};
 
-    (* ram_style = "distributed" *) reg [N-1:0] tile_out [0:(COLS*MAX_OUT_PIXELS)-1];
     (* ram_style = "distributed" *) reg [N-1:0] logit_mem [0:NUM_CLASSES-1];
     reg [N-1:0] bias_tile [0:COLS-1];
+
+    wire [ACC_W-1:0] tile_read_data [0:COLS-1];
+    wire [ACC_W-1:0] tile_write_data [0:COLS-1];
+    wire [N-1:0] tile_read_posit [0:COLS-1];
+    wire [COLS-1:0] tile_write_en;
+    wire tile_read_en;
+    wire [PIXEL_ADDR_W-1:0] tile_read_addr;
+    wire [PIXEL_ADDR_W-1:0] tile_write_addr;
 
     reg [5:0] state;
     reg [3:0] current_layer;
@@ -218,6 +226,8 @@ module reduced_vgg16_mnist_tiled_core #(
     reg [31:0] post_idx;
     reg [31:0] post_total;
     reg [31:0] post_read_addr;
+    reg [COL_ADDR_W-1:0] post_read_col;
+    reg [PIXEL_ADDR_W-1:0] post_read_pix;
     reg [31:0] post_ch;
     reg [31:0] post_oy;
     reg [31:0] post_ox;
@@ -231,6 +241,7 @@ module reduced_vgg16_mnist_tiled_core #(
     reg [N-1:0] argmax_best_value;
     reg [CLASS_W-1:0] argmax_best_class;
     reg [N-1:0] selected_logit_data;
+    reg store_logit_wait;
 
     reg core_pe_en;
     reg core_clear_pipe;
@@ -245,12 +256,16 @@ module reduced_vgg16_mnist_tiled_core #(
     wire core_result_valid;
     wire [PIXEL_ADDR_W-1:0] core_result_tag;
     wire [COLS*N-1:0] core_result_data;
+    wire [COLS*QW-1:0] core_result_quire;
     wire [COLS-1:0] core_result_is_nar;
 
     wire [N-1:0] relu_single_out;
     wire [N-1:0] pool_single_out;
-    wire [N-1:0] stream_acc_old [0:COLS-1];
-    wire [N-1:0] stream_acc_sum [0:COLS-1];
+    reg accum_pending;
+    reg [PIXEL_ADDR_W-1:0] accum_tag;
+    reg [COLS*N-1:0] accum_data;
+    reg [COLS*QW-1:0] accum_quire;
+    reg [COLS-1:0] accum_is_nar;
 
     integer i;
     integer load_row;
@@ -264,6 +279,7 @@ module reduced_vgg16_mnist_tiled_core #(
     integer pool_out_pixels;
     integer ky;
     integer kx;
+    integer select_col;
 
     function [31:0] layer_in_ch;
         input [3:0] layer;
@@ -466,8 +482,9 @@ module reduced_vgg16_mnist_tiled_core #(
 
     always @(*) begin
         selected_post_data = POSIT_ZERO;
-        if (post_read_addr < COLS*MAX_OUT_PIXELS)
-            selected_post_data = tile_out[post_read_addr];
+        for (select_col = 0; select_col < COLS; select_col = select_col + 1)
+            if (post_read_col == select_col)
+                selected_post_data = tile_read_posit[select_col];
 
         selected_logit_data = POSIT_ZERO;
         if (argmax_addr < NUM_CLASSES)
@@ -509,26 +526,123 @@ module reduced_vgg16_mnist_tiled_core #(
     genvar gc;
     generate
         for (gc = 0; gc < COLS; gc = gc + 1) begin : STREAM_ACC_GEN
-            assign stream_acc_old[gc] =
-                ((oc_base + gc) < cur_out_ch &&
-                 core_result_tag < MAX_OUT_PIXELS) ?
-                tile_out[(gc * MAX_OUT_PIXELS) + core_result_tag] :
-                POSIT_ZERO;
+            assign tile_write_en[gc] =
+                ((state == ST_INIT_TILE) &&
+                 (init_col == gc) &&
+                 ((oc_base + gc) < cur_out_ch) &&
+                 (init_pix < cur_out_pixels)) ||
+                (accum_pending && ((oc_base + gc) < cur_out_ch));
 
-            posit_adder #(
-                .N(N),
-                .ES(ES)
-            ) STREAM_ACCUM_ADDER (
-                .posit_a(stream_acc_old[gc]),
-                .posit_b(core_result_data[gc*N +: N]),
-                .posit_out(stream_acc_sum[gc])
+            if (USE_QUIRE == 0) begin : REGULAR_ACCUM
+                wire [N-1:0] stream_acc_sum;
+
+                posit_adder #(.N(N), .ES(ES)) STREAM_ACCUM_ADDER (
+                    .posit_a(tile_read_data[gc][N-1:0]),
+                    .posit_b(accum_data[gc*N +: N]),
+                    .posit_out(stream_acc_sum)
+                );
+
+                assign tile_read_posit[gc] = tile_read_data[gc][N-1:0];
+                assign tile_write_data[gc] =
+                    (state == ST_INIT_TILE) ? bias_tile[gc] :
+                    (accum_is_nar[gc] ? POSIT_NAR : stream_acc_sum);
+            end
+            else begin : QUIRE_ACCUM
+                wire signed [QW-1:0] bias_quire;
+                wire bias_is_nar;
+                wire signed [QW-1:0] accumulated_quire;
+                wire accumulated_nar;
+
+                posit_to_quire #(
+                    .N(N), .ES(ES), .QW(QW), .QF(QF)
+                ) BIAS_TO_QUIRE (
+                    .posit_in(bias_tile[gc]),
+                    .quire_out(bias_quire),
+                    .is_nar(bias_is_nar)
+                );
+
+                (* use_dsp = "yes" *) wire signed [QW-1:0] quire_sum =
+                    $signed(tile_read_data[gc][QW-1:0]) +
+                    $signed(accum_quire[gc*QW +: QW]);
+
+                assign accumulated_quire = tile_read_data[gc][QW] ?
+                                           {QW{1'b0}} : quire_sum;
+                assign accumulated_nar = tile_read_data[gc][QW] |
+                                         accum_is_nar[gc];
+
+                quire_to_posit #(
+                    .N(N), .ES(ES), .QW(QW), .QF(QF)
+                ) TILE_TO_POSIT (
+                    .quire_in(tile_read_data[gc][QW-1:0]),
+                    .is_nar(tile_read_data[gc][QW]),
+                    .posit_out(tile_read_posit[gc])
+                );
+
+                assign tile_write_data[gc] =
+                    (state == ST_INIT_TILE) ? {bias_is_nar, bias_quire} :
+                    {accumulated_nar, accumulated_quire};
+            end
+
+            xpm_memory_sdpram #(
+                .MEMORY_SIZE(MAX_OUT_PIXELS * ACC_W),
+                .MEMORY_PRIMITIVE("block"),
+                .CLOCKING_MODE("common_clock"),
+                .ECC_MODE("no_ecc"),
+                .MEMORY_INIT_FILE("none"),
+                .MEMORY_INIT_PARAM("0"),
+                .USE_MEM_INIT(0),
+                .WAKEUP_TIME("disable_sleep"),
+                .AUTO_SLEEP_TIME(0),
+                .MESSAGE_CONTROL(0),
+                .USE_EMBEDDED_CONSTRAINT(0),
+                .MEMORY_OPTIMIZATION("true"),
+                .CASCADE_HEIGHT(0),
+                .SIM_ASSERT_CHK(0),
+                .WRITE_PROTECT(1),
+                .WRITE_DATA_WIDTH_A(ACC_W),
+                .BYTE_WRITE_WIDTH_A(ACC_W),
+                .ADDR_WIDTH_A(PIXEL_ADDR_W),
+                .RST_MODE_A("SYNC"),
+                .READ_DATA_WIDTH_B(ACC_W),
+                .ADDR_WIDTH_B(PIXEL_ADDR_W),
+                .READ_RESET_VALUE_B("0"),
+                .READ_LATENCY_B(1),
+                .WRITE_MODE_B("read_first"),
+                .RST_MODE_B("SYNC")
+            ) TILE_BANK (
+                .sleep(1'b0),
+                .clka(clk),
+                .ena(tile_write_en[gc]),
+                .wea(tile_write_en[gc]),
+                .addra(tile_write_addr),
+                .dina(tile_write_data[gc]),
+                .injectsbiterra(1'b0),
+                .injectdbiterra(1'b0),
+                .clkb(clk),
+                .rstb(reset),
+                .enb(tile_read_en),
+                .regceb(1'b1),
+                .addrb(tile_read_addr),
+                .doutb(tile_read_data[gc]),
+                .sbiterrb(),
+                .dbiterrb()
             );
         end
     endgenerate
 
+    assign tile_read_en = core_result_valid ||
+                          (state == ST_POST_DIRECT_WAIT) ||
+                          (state == ST_POST_POOL_WAIT) ||
+                          ((state == ST_STORE_LOGITS) && !store_logit_wait &&
+                           (post_idx < COLS));
+    assign tile_read_addr = core_result_valid ? core_result_tag : post_read_pix;
+    assign tile_write_addr = (state == ST_INIT_TILE) ?
+                             init_pix[PIXEL_ADDR_W-1:0] : accum_tag;
+
     generate
         if (USE_QUIRE == 0) begin : REGULAR_CORE
             assign core_result_is_nar = {COLS{1'b0}};
+            assign core_result_quire = {COLS*QW{1'b0}};
 
             systolic_stream_core #(
                 .N(N),
@@ -583,6 +697,7 @@ module reduced_vgg16_mnist_tiled_core #(
                 .result_valid(core_result_valid),
                 .result_tag(core_result_tag),
                 .result_data(core_result_data),
+                .result_quire(core_result_quire),
                 .result_is_nar(core_result_is_nar)
             );
         end
@@ -639,6 +754,8 @@ module reduced_vgg16_mnist_tiled_core #(
             post_idx <= 0;
             post_total <= 0;
             post_read_addr <= 0;
+            post_read_col <= {COL_ADDR_W{1'b0}};
+            post_read_pix <= {PIXEL_ADDR_W{1'b0}};
             post_ch <= 0;
             post_oy <= 0;
             post_ox <= 0;
@@ -649,6 +766,13 @@ module reduced_vgg16_mnist_tiled_core #(
             argmax_addr <= 0;
             argmax_best_value <= POSIT_ZERO;
             argmax_best_class <= {CLASS_W{1'b0}};
+            store_logit_wait <= 1'b0;
+
+            accum_pending <= 1'b0;
+            accum_tag <= {PIXEL_ADDR_W{1'b0}};
+            accum_data <= {COLS*N{1'b0}};
+            accum_quire <= {COLS*QW{1'b0}};
+            accum_is_nar <= {COLS{1'b0}};
 
             core_pe_en <= 1'b0;
             core_clear_pipe <= 1'b0;
@@ -677,6 +801,14 @@ module reduced_vgg16_mnist_tiled_core #(
             core_weight_load_en <= 1'b0;
             core_weight_data <= POSIT_ZERO;
 
+            accum_pending <= core_result_valid;
+            if (core_result_valid) begin
+                accum_tag <= core_result_tag;
+                accum_data <= core_result_data;
+                accum_quire <= core_result_quire;
+                accum_is_nar <= core_result_is_nar;
+            end
+
             if (!busy && cfg_write_en && cfg_mem == CFG_INPUT &&
                 cfg_layer == 4'd0 && cfg_addr < IN_CH*IN_H*IN_W) begin
                 feature_wr_valid <= 1'b1;
@@ -685,16 +817,7 @@ module reduced_vgg16_mnist_tiled_core #(
                 feature_wr_data <= cfg_data;
             end
 
-            if (core_result_valid) begin
-                for (i = 0; i < COLS; i = i + 1) begin
-                    if ((oc_base + i) < cur_out_ch) begin
-                        out_index = (i * MAX_OUT_PIXELS) + core_result_tag;
-                        if (out_index < COLS*MAX_OUT_PIXELS) begin
-                            tile_out[out_index] <=
-                                core_result_is_nar[i] ? POSIT_NAR : stream_acc_sum[i];
-                        end
-                    end
-                end
+            if (accum_pending) begin
                 stream_recv_count <= stream_recv_count + 1;
             end
 
@@ -765,20 +888,20 @@ module reduced_vgg16_mnist_tiled_core #(
                 end
 
                 ST_INIT_TILE: begin
-                    if (init_col < COLS && (oc_base + init_col) < cur_out_ch) begin
-                        out_index = (init_col * MAX_OUT_PIXELS) + init_pix;
-                        if (out_index < COLS*MAX_OUT_PIXELS) begin
-                            tile_out[out_index] <= bias_tile[init_col];
-                        end
-                    end
-
-                    if (init_col >= COLS-1 && init_pix >= cur_out_pixels-1) begin
-                        load_index <= 0;
-                        state <= ST_LOAD_TILE;
-                    end
-                    else if (init_pix >= cur_out_pixels-1) begin
+                    // Keep this state active for the terminal element so its
+                    // bias write reaches the tile BRAM before loading starts.
+                    // Previously the final column/pixel was skipped entirely,
+                    // leaving a stale accumulator entry (notably class 3 for
+                    // the first 4-wide final-classifier tile).
+                    if (init_pix >= cur_out_pixels-1) begin
                         init_pix <= 0;
-                        init_col <= init_col + 1;
+                        if (init_col >= COLS-1) begin
+                            load_index <= 0;
+                            state <= ST_LOAD_TILE;
+                        end
+                        else begin
+                            init_col <= init_col + 1;
+                        end
                     end
                     else begin
                         init_pix <= init_pix + 1;
@@ -887,11 +1010,11 @@ module reduced_vgg16_mnist_tiled_core #(
                         if (stream_send_count + 1 < cur_out_pixels)
                             state <= ST_PREP_ACT_READ;
                     end
-                    else if (!(core_result_valid && (stream_recv_count == cur_out_pixels-1))) begin
+                    else if (!(accum_pending && (stream_recv_count == cur_out_pixels-1))) begin
                         core_pe_en <= 1'b1;
                     end
 
-                    if (core_result_valid && (stream_recv_count == cur_out_pixels-1))
+                    if (accum_pending && (stream_recv_count == cur_out_pixels-1))
                         state <= ST_NEXT_DOT;
                 end
 
@@ -909,6 +1032,8 @@ module reduced_vgg16_mnist_tiled_core #(
                 ST_NEXT_OC: begin
                     if (cur_final_layer) begin
                         post_idx <= 0;
+                        post_read_pix <= {PIXEL_ADDR_W{1'b0}};
+                        store_logit_wait <= 1'b0;
                         state <= ST_STORE_LOGITS;
                     end
                     else if (cur_pool_after) begin
@@ -930,10 +1055,17 @@ module reduced_vgg16_mnist_tiled_core #(
 
                 ST_STORE_LOGITS: begin
                     if (post_idx < COLS) begin
-                        if ((oc_base + post_idx) < NUM_CLASSES)
-                            logit_mem[oc_base + post_idx] <=
-                                tile_out[(post_idx * MAX_OUT_PIXELS)];
-                        post_idx <= post_idx + 1;
+                        if (!store_logit_wait) begin
+                            post_read_col <= post_idx[COL_ADDR_W-1:0];
+                            post_read_pix <= {PIXEL_ADDR_W{1'b0}};
+                            store_logit_wait <= 1'b1;
+                        end
+                        else begin
+                            if ((oc_base + post_idx) < NUM_CLASSES)
+                                logit_mem[oc_base + post_idx] <= selected_post_data;
+                            post_idx <= post_idx + 1;
+                            store_logit_wait <= 1'b0;
+                        end
                     end
                     else if ((oc_base + COLS) < cur_out_ch) begin
                         oc_base <= oc_base + COLS;
@@ -941,6 +1073,7 @@ module reduced_vgg16_mnist_tiled_core #(
                         bias_index <= 0;
                         init_col <= 0;
                         init_pix <= 0;
+                        store_logit_wait <= 1'b0;
                         state <= ST_FETCH_BIAS;
                     end
                     else begin
@@ -959,6 +1092,8 @@ module reduced_vgg16_mnist_tiled_core #(
                         ((oc_base + local_col) < cur_out_ch)) begin
                         local_pix = post_idx - (local_col * cur_out_pixels);
                         post_read_addr <= (local_col * MAX_OUT_PIXELS) + local_pix;
+                        post_read_col <= local_col[COL_ADDR_W-1:0];
+                        post_read_pix <= local_pix[PIXEL_ADDR_W-1:0];
                         state <= ST_POST_DIRECT_WAIT;
                     end
                     else if ((post_idx < post_total) &&
@@ -1008,6 +1143,9 @@ module reduced_vgg16_mnist_tiled_core #(
                         post_read_addr <= (post_ch * MAX_OUT_PIXELS) +
                                           (((post_oy * 2) + ky) * cur_out_w) +
                                           ((post_ox * 2) + kx);
+                        post_read_col <= post_ch[COL_ADDR_W-1:0];
+                        post_read_pix <= ((((post_oy * 2) + ky) * cur_out_w) +
+                                          ((post_ox * 2) + kx));
                         state <= ST_POST_POOL_WAIT;
                     end
                     else if ((post_idx < post_total) &&
@@ -1092,7 +1230,8 @@ module reduced_vgg16_mnist_tiled_core #(
                 ST_ARGMAX_CAPTURE: begin
                     if (argmax_idx == 0 || is_better_logit(selected_logit_data, argmax_best_value)) begin
                         argmax_best_value <= selected_logit_data;
-                        argmax_best_class <= argmax_idx[CLASS_W-1:0];
+                        // Assignment truncates to CLASS_W without a parameterized part-select.
+                        argmax_best_class <= argmax_idx;
                     end
                     argmax_idx <= argmax_idx + 1;
                     state <= ST_ARGMAX_SET;

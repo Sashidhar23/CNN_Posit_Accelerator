@@ -3,8 +3,8 @@
 module systolic_array_quire #(
     parameter N = 8,
     parameter ES = 1,
-    parameter ROWS = 3,
-    parameter COLS = 3,
+    parameter ROWS = 4,
+    parameter COLS = 4,
     parameter QW = 48,
     parameter QF = QW / 2
 )(

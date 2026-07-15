@@ -3,8 +3,8 @@
 module systolic_array #(
     parameter N = 8,
     parameter ES = 1,
-    parameter ROWS = 3,
-    parameter COLS = 3
+    parameter ROWS = 4,
+    parameter COLS = 4
 )(
     input  wire                         clk,
     input  wire                         reset,

@@ -1,15 +1,19 @@
 `timescale 1ns / 1ps
 
-// ZCU102 deployment wrapper.
+// AXI deployment wrapper.
 //
-// S_AXI is the PS control path. M_AXI is a read-only data path to PS DDR.
-// Parameters remain in DDR; feature maps use the two on-chip BRAM banks below.
+// S_AXI is the host control path. M_AXI is a read-only packed-data path to
+// external DDR or memory-mapped QSPI flash. Feature maps use the two on-chip
+// BRAM banks below.
 module cnn_zynq_axi_master_wrapper #(
     parameter integer C_S_AXI_DATA_WIDTH = 32,
     parameter integer C_S_AXI_ADDR_WIDTH = 7,
     parameter integer C_M_AXI_DATA_WIDTH = 64,
     parameter integer C_M_AXI_ADDR_WIDTH = 40,
     parameter integer C_M_AXI_ID_WIDTH = 1,
+    parameter [31:0] DEFAULT_WEIGHT_BASE = 32'd0,
+    parameter [31:0] DEFAULT_BIAS_BASE = 32'd0,
+    parameter [31:0] DEFAULT_IMAGE_BASE = 32'd0,
     parameter N = 8,
     parameter ES = 1,
     parameter USE_QUIRE = 1,
@@ -41,7 +45,7 @@ module cnn_zynq_axi_master_wrapper #(
     input  wire                              aclk,
     input  wire                              aresetn,
 
-    // AXI4-Lite slave: connect to a Zynq MPSoC PS master through SmartConnect.
+    // AXI4-Lite slave: connect to the deployment target's control master.
     input  wire [C_S_AXI_ADDR_WIDTH-1:0]     s_axi_awaddr,
     input  wire [2:0]                        s_axi_awprot,
     input  wire                              s_axi_awvalid,
@@ -62,7 +66,7 @@ module cnn_zynq_axi_master_wrapper #(
     output reg                               s_axi_rvalid,
     input  wire                              s_axi_rready,
 
-    // AXI4 master: connect to an HP/HPC DDR path through SmartConnect.
+    // AXI4 master: connect to the deployment target's external-memory path.
     output wire [C_M_AXI_ID_WIDTH-1:0]       m_axi_awid,
     output wire [C_M_AXI_ADDR_WIDTH-1:0]     m_axi_awaddr,
     output wire [7:0]                        m_axi_awlen,
@@ -104,7 +108,14 @@ module cnn_zynq_axi_master_wrapper #(
     input  wire                              m_axi_rvalid,
     output reg                               m_axi_rready,
 
-    output wire                              irq
+    output wire                              irq,
+    output wire                              busy,
+    output wire                              done,
+    output wire                              error,
+    // Ten classes always fit in four bits. Keeping this deployment-facing bus
+    // explicit also avoids Vivado module-reference width inference collapsing
+    // a parameterized output to one bit in IP Integrator.
+    output wire [3:0]                        class_result
 );
 
     function integer imax;
@@ -130,6 +141,8 @@ module cnn_zynq_axi_master_wrapper #(
         imax(C4*H4*W4,
         imax(C4*H5*W5,
         imax(FC1, NUM_CLASSES))))))))));
+    localparam integer FEATURE_ADDR_W =
+        (MAX_FEATURE_VALUES <= 2) ? 1 : $clog2(MAX_FEATURE_VALUES);
 
     localparam [1:0] CFG_INPUT = 2'd0;
     localparam [1:0] PARAM_WEIGHT = 2'd0;
@@ -186,7 +199,7 @@ module cnn_zynq_axi_master_wrapper #(
     localparam [3:0] ST_ERROR         = 4'd10;
 
     // Full AXI4 write channel is intentionally inactive: this accelerator only
-    // reads model/image data from DDR and writes intermediate maps to BRAM.
+    // reads model/image data from external memory and writes feature maps to BRAM.
     assign m_axi_awid = {C_M_AXI_ID_WIDTH{1'b0}};
     assign m_axi_awaddr = {C_M_AXI_ADDR_WIDTH{1'b0}};
     assign m_axi_awlen = 8'd0;
@@ -248,6 +261,9 @@ module cnn_zynq_axi_master_wrapper #(
     reg core_param_resp_valid;
     reg [N-1:0] core_param_resp_data;
     reg [31:0] pending_value_index;
+    reg cache_valid;
+    reg [C_M_AXI_ADDR_WIDTH-1:0] cache_addr;
+    reg [C_M_AXI_DATA_WIDTH-1:0] cache_data;
 
     wire core_param_req_valid;
     wire [1:0] core_param_req_kind;
@@ -257,7 +273,7 @@ module cnn_zynq_axi_master_wrapper #(
     wire core_feature_rd_bank;
     wire [31:0] core_feature_rd_addr;
     reg core_feature_rd_resp_valid;
-    reg [N-1:0] core_feature_rd_resp_data;
+    wire [N-1:0] core_feature_rd_resp_data;
     wire core_feature_wr_valid;
     wire core_feature_wr_bank;
     wire [31:0] core_feature_wr_addr;
@@ -267,11 +283,118 @@ module cnn_zynq_axi_master_wrapper #(
     wire dut_done;
     wire [CLASS_W-1:0] dut_class_out;
 
-    // These match the two feature-bank arrays modelled in the inference TB.
-    (* ram_style = "block" *) reg [N-1:0] feature_bank0 [0:MAX_FEATURE_VALUES-1];
-    (* ram_style = "block" *) reg [N-1:0] feature_bank1 [0:MAX_FEATURE_VALUES-1];
-
+    wire [N-1:0] feature_bank0_rd_data;
+    wire [N-1:0] feature_bank1_rd_data;
+    reg feature_rd_bank_q;
+    reg feature_rd_in_range_q;
     wire reset = ~aresetn;
+
+    wire feature_rd_in_range =
+        core_feature_rd_req_valid && (core_feature_rd_addr < MAX_FEATURE_VALUES);
+    wire feature_wr_in_range =
+        core_feature_wr_valid && (core_feature_wr_addr < MAX_FEATURE_VALUES);
+    wire [FEATURE_ADDR_W-1:0] feature_rd_addr_narrow =
+        core_feature_rd_addr[FEATURE_ADDR_W-1:0];
+    wire [FEATURE_ADDR_W-1:0] feature_wr_addr_narrow =
+        core_feature_wr_addr[FEATURE_ADDR_W-1:0];
+
+    assign core_feature_rd_resp_data = !feature_rd_in_range_q ? {N{1'b0}} :
+                                       (feature_rd_bank_q ? feature_bank1_rd_data :
+                                                           feature_bank0_rd_data);
+
+    // Explicit XPM simple-dual-port memories prevent Vivado from dissolving
+    // the feature maps into LUTRAM. Port A writes while port B performs the
+    // core's one-cycle synchronous reads.
+    xpm_memory_sdpram #(
+        .MEMORY_SIZE(MAX_FEATURE_VALUES * N),
+        .MEMORY_PRIMITIVE("block"),
+        .CLOCKING_MODE("common_clock"),
+        .ECC_MODE("no_ecc"),
+        .MEMORY_INIT_FILE("none"),
+        .MEMORY_INIT_PARAM("0"),
+        .USE_MEM_INIT(0),
+        .WAKEUP_TIME("disable_sleep"),
+        .AUTO_SLEEP_TIME(0),
+        .MESSAGE_CONTROL(0),
+        .USE_EMBEDDED_CONSTRAINT(0),
+        .MEMORY_OPTIMIZATION("true"),
+        .CASCADE_HEIGHT(0),
+        .SIM_ASSERT_CHK(0),
+        .WRITE_PROTECT(1),
+        .WRITE_DATA_WIDTH_A(N),
+        .BYTE_WRITE_WIDTH_A(N),
+        .ADDR_WIDTH_A(FEATURE_ADDR_W),
+        .RST_MODE_A("SYNC"),
+        .READ_DATA_WIDTH_B(N),
+        .ADDR_WIDTH_B(FEATURE_ADDR_W),
+        .READ_RESET_VALUE_B("0"),
+        .READ_LATENCY_B(1),
+        .WRITE_MODE_B("read_first"),
+        .RST_MODE_B("SYNC")
+    ) FEATURE_BANK0 (
+        .sleep(1'b0),
+        .clka(aclk),
+        .ena(feature_wr_in_range && !core_feature_wr_bank),
+        .wea(feature_wr_in_range && !core_feature_wr_bank),
+        .addra(feature_wr_addr_narrow),
+        .dina(core_feature_wr_data),
+        .injectsbiterra(1'b0),
+        .injectdbiterra(1'b0),
+        .clkb(aclk),
+        .rstb(reset),
+        .enb(feature_rd_in_range),
+        .regceb(1'b1),
+        .addrb(feature_rd_addr_narrow),
+        .doutb(feature_bank0_rd_data),
+        .sbiterrb(),
+        .dbiterrb()
+    );
+
+    xpm_memory_sdpram #(
+        .MEMORY_SIZE(MAX_FEATURE_VALUES * N),
+        .MEMORY_PRIMITIVE("block"),
+        .CLOCKING_MODE("common_clock"),
+        .ECC_MODE("no_ecc"),
+        .MEMORY_INIT_FILE("none"),
+        .MEMORY_INIT_PARAM("0"),
+        .USE_MEM_INIT(0),
+        .WAKEUP_TIME("disable_sleep"),
+        .AUTO_SLEEP_TIME(0),
+        .MESSAGE_CONTROL(0),
+        .USE_EMBEDDED_CONSTRAINT(0),
+        .MEMORY_OPTIMIZATION("true"),
+        .CASCADE_HEIGHT(0),
+        .SIM_ASSERT_CHK(0),
+        .WRITE_PROTECT(1),
+        .WRITE_DATA_WIDTH_A(N),
+        .BYTE_WRITE_WIDTH_A(N),
+        .ADDR_WIDTH_A(FEATURE_ADDR_W),
+        .RST_MODE_A("SYNC"),
+        .READ_DATA_WIDTH_B(N),
+        .ADDR_WIDTH_B(FEATURE_ADDR_W),
+        .READ_RESET_VALUE_B("0"),
+        .READ_LATENCY_B(1),
+        .WRITE_MODE_B("read_first"),
+        .RST_MODE_B("SYNC")
+    ) FEATURE_BANK1 (
+        .sleep(1'b0),
+        .clka(aclk),
+        .ena(feature_wr_in_range && core_feature_wr_bank),
+        .wea(feature_wr_in_range && core_feature_wr_bank),
+        .addra(feature_wr_addr_narrow),
+        .dina(core_feature_wr_data),
+        .injectsbiterra(1'b0),
+        .injectdbiterra(1'b0),
+        .clkb(aclk),
+        .rstb(reset),
+        .enb(feature_rd_in_range),
+        .regceb(1'b1),
+        .addrb(feature_rd_addr_narrow),
+        .doutb(feature_bank1_rd_data),
+        .sbiterrb(),
+        .dbiterrb()
+    );
+
     // AXI4-Lite registers are 32-bit word addressed at byte bits [5:2].
     // Fixed indices keep Vivado IP-integrator OOC synthesis parameter-safe.
     wire [3:0] aw_word_addr = awaddr_hold[5:2];
@@ -282,6 +405,10 @@ module cnn_zynq_axi_master_wrapper #(
     assign s_axi_wready = !w_hold && !s_axi_bvalid;
     assign s_axi_arready = !s_axi_rvalid;
     assign irq = done_latched | error_latched;
+    assign busy = (state != ST_IDLE);
+    assign done = done_latched;
+    assign error = error_latched;
+    assign class_result = dut_class_out;
 
     function [31:0] layer_weight_base;
         input [3:0] layer;
@@ -334,6 +461,16 @@ module cnn_zynq_axi_master_wrapper #(
             packed_value_at = word[bit_base +: N];
         end
     endfunction
+
+    wire [C_M_AXI_ADDR_WIDTH-1:0] image_word_addr =
+        image_base_addr + ((image_index / VALUES_PER_WORD) * WORD_BYTES);
+    wire [31:0] requested_param_value_index =
+        (core_param_req_kind == PARAM_WEIGHT) ?
+            layer_weight_base(core_param_req_layer) + core_param_req_addr :
+            layer_bias_base(core_param_req_layer) + core_param_req_addr;
+    wire [C_M_AXI_ADDR_WIDTH-1:0] requested_param_word_addr =
+        ((core_param_req_kind == PARAM_WEIGHT) ? weight_base_addr : bias_base_addr) +
+        ((requested_param_value_index / VALUES_PER_WORD) * WORD_BYTES);
 
     function [31:0] merge_wstrb;
         input [31:0] old_value;
@@ -410,9 +547,9 @@ module cnn_zynq_axi_master_wrapper #(
             s_axi_rvalid <= 1'b0;
             s_axi_rresp <= 2'b00;
             s_axi_rdata <= {C_S_AXI_DATA_WIDTH{1'b0}};
-            weight_base_addr <= 32'd0;
-            bias_base_addr <= 32'd0;
-            image_base_addr <= 32'd0;
+            weight_base_addr <= DEFAULT_WEIGHT_BASE;
+            bias_base_addr <= DEFAULT_BIAS_BASE;
+            image_base_addr <= DEFAULT_IMAGE_BASE;
             timeout_limit <= 32'd0;
             dut_logit_addr <= 32'd0;
             control_start_pulse <= 1'b0;
@@ -484,36 +621,26 @@ module cnn_zynq_axi_master_wrapper #(
         end
     end
 
-    // A synchronous, one-cycle feature-memory response matches the tiled core
-    // contract used by the existing self-checking inference testbench.
+    // Preserve the tiled core's one-cycle response contract. The XPM output is
+    // combinationally selected by the bank bit registered with the request.
     always @(posedge aclk) begin
         if (reset) begin
             core_feature_rd_resp_valid <= 1'b0;
-            core_feature_rd_resp_data <= {N{1'b0}};
+            feature_rd_bank_q <= 1'b0;
+            feature_rd_in_range_q <= 1'b0;
         end
         else begin
+            // Padding requests use address MAX_FEATURE_VALUES. They still
+            // complete in one cycle and return zero so the core cannot stall.
             core_feature_rd_resp_valid <= core_feature_rd_req_valid;
-            if (core_feature_rd_req_valid && core_feature_rd_addr < MAX_FEATURE_VALUES) begin
-                if (core_feature_rd_bank)
-                    core_feature_rd_resp_data <= feature_bank1[core_feature_rd_addr];
-                else
-                    core_feature_rd_resp_data <= feature_bank0[core_feature_rd_addr];
-            end
-            else begin
-                core_feature_rd_resp_data <= {N{1'b0}};
-            end
-
-            if (core_feature_wr_valid && core_feature_wr_addr < MAX_FEATURE_VALUES) begin
-                if (core_feature_wr_bank)
-                    feature_bank1[core_feature_wr_addr] <= core_feature_wr_data;
-                else
-                    feature_bank0[core_feature_wr_addr] <= core_feature_wr_data;
-            end
+            feature_rd_in_range_q <= feature_rd_in_range;
+            if (core_feature_rd_req_valid)
+                feature_rd_bank_q <= core_feature_rd_bank;
         end
     end
 
     // One outstanding AXI read is sufficient because the tiled core requests a
-    // parameter then explicitly waits for its response. DDR stores packed N-bit
+    // parameter then explicitly waits for its response. Memory stores packed N-bit
     // values little-endian within each AXI word.
     always @(posedge aclk) begin
         if (reset) begin
@@ -531,6 +658,9 @@ module cnn_zynq_axi_master_wrapper #(
             core_param_resp_valid <= 1'b0;
             core_param_resp_data <= {N{1'b0}};
             pending_value_index <= 32'd0;
+            cache_valid <= 1'b0;
+            cache_addr <= {C_M_AXI_ADDR_WIDTH{1'b0}};
+            cache_data <= {C_M_AXI_DATA_WIDTH{1'b0}};
             m_axi_araddr <= {C_M_AXI_ADDR_WIDTH{1'b0}};
             m_axi_arvalid <= 1'b0;
             m_axi_rready <= 1'b0;
@@ -558,9 +688,19 @@ module cnn_zynq_axi_master_wrapper #(
                 end
 
                 ST_IMAGE_REQ: begin
-                    m_axi_araddr <= image_base_addr + ((image_index / VALUES_PER_WORD) * WORD_BYTES);
-                    m_axi_arvalid <= 1'b1;
-                    state <= ST_IMAGE_AR;
+                    if (cache_valid && cache_addr == image_word_addr) begin
+                        dut_cfg_layer <= 4'd0;
+                        dut_cfg_mem <= CFG_INPUT;
+                        dut_cfg_addr <= image_index;
+                        dut_cfg_data <= packed_value_at(cache_data, image_index);
+                        dut_cfg_write_en <= 1'b1;
+                        state <= ST_IMAGE_WRITE;
+                    end
+                    else begin
+                        m_axi_araddr <= image_word_addr;
+                        m_axi_arvalid <= 1'b1;
+                        state <= ST_IMAGE_AR;
+                    end
                 end
 
                 ST_IMAGE_AR: begin
@@ -579,6 +719,9 @@ module cnn_zynq_axi_master_wrapper #(
                             state <= ST_ERROR;
                         end
                         else begin
+                            cache_valid <= 1'b1;
+                            cache_addr <= m_axi_araddr;
+                            cache_data <= m_axi_rdata;
                             dut_cfg_layer <= 4'd0;
                             dut_cfg_mem <= CFG_INPUT;
                             dut_cfg_addr <= image_index;
@@ -614,19 +757,17 @@ module cnn_zynq_axi_master_wrapper #(
                         state <= ST_ERROR;
                     end
                     else if (core_param_req_valid) begin
-                        if (core_param_req_kind == PARAM_WEIGHT)
-                            pending_value_index <= layer_weight_base(core_param_req_layer) + core_param_req_addr;
-                        else
-                            pending_value_index <= layer_bias_base(core_param_req_layer) + core_param_req_addr;
-
-                        if (core_param_req_kind == PARAM_WEIGHT)
-                            m_axi_araddr <= weight_base_addr +
-                                (((layer_weight_base(core_param_req_layer) + core_param_req_addr) / VALUES_PER_WORD) * WORD_BYTES);
-                        else
-                            m_axi_araddr <= bias_base_addr +
-                                (((layer_bias_base(core_param_req_layer) + core_param_req_addr) / VALUES_PER_WORD) * WORD_BYTES);
-                        m_axi_arvalid <= 1'b1;
-                        state <= ST_PARAM_AR;
+                        pending_value_index <= requested_param_value_index;
+                        if (cache_valid && cache_addr == requested_param_word_addr) begin
+                            core_param_resp_data <= packed_value_at(
+                                cache_data, requested_param_value_index);
+                            core_param_resp_valid <= 1'b1;
+                        end
+                        else begin
+                            m_axi_araddr <= requested_param_word_addr;
+                            m_axi_arvalid <= 1'b1;
+                            state <= ST_PARAM_AR;
+                        end
                     end
                     else begin
                         timeout_count <= timeout_count + 1;
@@ -649,6 +790,9 @@ module cnn_zynq_axi_master_wrapper #(
                             state <= ST_ERROR;
                         end
                         else begin
+                            cache_valid <= 1'b1;
+                            cache_addr <= m_axi_araddr;
+                            cache_data <= m_axi_rdata;
                             core_param_resp_data <= packed_value_at(m_axi_rdata, pending_value_index);
                             core_param_resp_valid <= 1'b1;
                             state <= ST_WAIT_DUT;
